@@ -30,7 +30,15 @@ brew install scrcpy            # macOS
 winget install Genymobile.scrcpy   # Windows
 ```
 
-启动（USB）：
+本机（Fedora 45）已经装好官方 **v5.0.1**（解压在 `outputs/tools/`，SHA-256 已对过官方 `SHA256SUMS`，
+不需要 sudo），并封装了一条命令：
+
+```bash
+scripts/scrcpy-off.sh                  # = --turn-screen-off --stay-awake --no-audio --max-fps 30
+scripts/scrcpy-off.sh --max-fps 15     # 额外参数原样传给 scrcpy
+```
+
+启动（等价的手动命令）：
 
 ```bash
 scrcpy --turn-screen-off --stay-awake --no-audio --max-fps 30 --video-bit-rate 4M
@@ -66,10 +74,20 @@ adb shell wm dismiss-keyguard              # 无密码时解锁
 - 如果只是想让屏幕“黑掉但设备不休眠”（Android 15+）：
   ```bash
   adb shell cmd display power-off 0   # 0 = 主屏
-  adb shell cmd display power-on 0
+  adb shell cmd display power-on 0    # 这台 ROM 没有该子命令，见下
   ```
-  这条不经过锁屏，适合一边跑任务一边看日志；`screencap`/uiautomator 在熄屏下的行为因 ROM 而异，
-  需要截图时还是用 §1 或 §4。
+  实测（M2012K11AC / Android 17）：`power-off` 生效（HWC `powerMode=Off`、设备仍 Awake），
+  但 **`screencap` 会全黑**，而且这台 ROM 不认 `power-on`；恢复要按电源键再唤醒（`KEYCODE_POWER` → `KEYCODE_WAKEUP`）。
+  所以要看画面时用 §1 的 scrcpy，要自动截图用 §4 的 `--dim`，别用这条。
+
+## 2.1 实测：scrcpy 熄屏时截图仍可用
+
+本机验证（v5.0.1）：`--turn-screen-off` 生效后 `dumpsys SurfaceFlinger` 显示 `powerMode=Off`、
+`mWakefulness=Awake`，server 日志有 `Device display turned off`；此时 `screencap` 仍能取到**完整画面**
+（1080×2400，文件 ~200KB，亮度均值与亮屏基本一致）。scrcpy 退出后显示电源会自动恢复 `powerMode=On`。
+
+对比之下 `cmd display power-off` 会让 screencap 全黑——两者机制不同，别混用。
+（理论上截图流水线也能在 scrcpy 熄屏状态下跑，但自动点按/uiautomator 尚未验证，先不接。）
 
 ## 3. 无线调试：手机可以放进抽屉
 

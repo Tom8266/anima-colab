@@ -98,7 +98,12 @@ scripts/device_shots.sh --install --phase full          # 深/浅色、各页面
 scripts/device_shots.sh --install --phase full --dim    # 同上，面板亮度压到 1（护 AMOLED，截图不受影响）
 ```
 
-不亮屏调试（scrcpy 熄屏镜像、无线调试、熄屏跑长任务）见 [docs/device-debug.md](docs/device-debug.md)。
+不亮屏调试（scrcpy 熄屏镜像、无线调试、熄屏跑长任务）见 [docs/device-debug.md](docs/device-debug.md)；
+本机已装好 scrcpy，直接：
+
+```bash
+scripts/scrcpy-off.sh    # 画面镜像到电脑，手机面板保持熄灭（MOD+o 可切换）
+```
 
 单元测试：
 
