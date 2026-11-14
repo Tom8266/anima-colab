@@ -26,6 +26,10 @@ import com.tom.animacolab.data.ServerInfo
 import com.tom.animacolab.data.Snippet
 import com.tom.animacolab.data.Tag
 import com.tom.animacolab.data.TagCategory
+import com.tom.animacolab.colab.ColabSessionManager
+import com.tom.animacolab.colab.ColabSessionStore
+import com.tom.animacolab.colab.GoogleAuth
+import com.tom.animacolab.colab.GoogleAuthStore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -59,6 +63,10 @@ data class UiState(
     val viewerLoading: Boolean = false,
     val savingImage: Boolean = false,
     val message: String? = null,
+    val session: ColabSessionManager.State = ColabSessionManager.State.Off,
+    val deployLogs: List<String> = emptyList(),
+    val googleLoggedIn: Boolean = false,
+    val authUrlToOpen: String? = null,
 ) {
     val availableModels: List<Pair<ModelPreset, String>> get() = buildAvailable(info, presets)
     val currentPreset: ModelPreset? get() = presets.firstOrNull { it.id == form.modelId }
@@ -88,6 +96,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val assets = Assets(app)
     private val client = ComfyClient()
     private val loader = ImageLoader(client)
+    private val googleAuthStore = GoogleAuthStore(app)
+    private val googleAuth = GoogleAuth(googleAuthStore)
+    private val colabSessionStore = ColabSessionStore(app)
+    private val colabSession = ColabSessionManager(app, googleAuth, colabSessionStore, viewModelScope)
 
     private val _state = MutableStateFlow(UiState())
     val state: StateFlow<UiState> = _state.asStateFlow()
@@ -114,6 +126,30 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             )
         }
         if (config.configured) connect()
+
+        viewModelScope.launch {
+            colabSession.state.collect { st -> _state.update { it.copy(session = st) } }
+        }
+        viewModelScope.launch {
+            colabSession.logs.collect { logs -> _state.update { it.copy(deployLogs = logs) } }
+        }
+        viewModelScope.launch {
+            colabSession.pair.collect { pair ->
+                if (pair != null) {
+                    store.baseUrl = pair.baseUrl
+                    store.token = pair.token
+                    store.sessionManaged = true
+                    _state.update {
+                        it.copy(
+                            config = Config(pair.baseUrl, pair.token),
+                            googleLoggedIn = googleAuth.isLoggedIn(),
+                        )
+                    }
+                    connect()
+                }
+            }
+        }
+        _state.update { it.copy(googleLoggedIn = googleAuth.isLoggedIn()) }
     }
 
     fun imageLoader(): ImageLoader = loader
@@ -181,6 +217,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
         store.baseUrl = pair.baseUrl
         store.token = pair.token
+        store.sessionManaged = false
         _state.update { it.copy(config = Config(pair.baseUrl, pair.token)) }
         message("已保存配对信息，正在连接…")
         connect()
@@ -202,8 +239,75 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun clearConfig() {
         store.baseUrl = ""
         store.token = ""
+        store.sessionManaged = false
         _state.update { it.copy(config = Config(), connection = ConnectionState.NotConfigured, info = null) }
         message("已清除配对信息")
+    }
+
+    // ---------------- 一键 Colab 会话 ----------------
+
+    fun beginGoogleLogin() {
+        runCatching { googleAuth.buildAuthUrl() }
+            .onSuccess { url -> _state.update { it.copy(authUrlToOpen = url) } }
+            .onFailure { message("生成 Google 授权链接失败：${it.message}") }
+    }
+
+    fun consumeAuthUrl() = _state.update { it.copy(authUrlToOpen = null) }
+
+    fun completeGoogleLogin(rawCode: String) {
+        viewModelScope.launch {
+            try {
+                googleAuth.exchangeCode(rawCode)
+                _state.update { it.copy(googleLoggedIn = true) }
+                message("Google 登录成功，可以一键启动 Colab 了")
+            } catch (e: Exception) {
+                message(e.message ?: "登录失败")
+            }
+        }
+    }
+
+    fun logoutGoogle() {
+        viewModelScope.launch {
+            if (colabSession.isBusy) colabSession.cancelStart()
+            if (colabSessionStore.hasPair) {
+                colabSession.stop()
+                clearManagedConfig()
+            }
+            googleAuth.logout()
+            _state.update { it.copy(googleLoggedIn = false, session = ColabSessionManager.State.Off) }
+            message("已退出 Google")
+        }
+    }
+
+    fun startColabSession() {
+        if (!googleAuth.isLoggedIn()) {
+            message("先登录 Google 账号")
+            return
+        }
+        colabSession.forgetFailure()
+        colabSession.start()
+        message("正在启动 Colab T4…")
+    }
+
+    fun cancelColabStart() {
+        colabSession.cancelStart()
+        message("已取消启动")
+    }
+
+    fun stopColabSession() {
+        viewModelScope.launch {
+            colabSession.stop()
+            clearManagedConfig()
+            message("已释放 Colab 会话")
+        }
+    }
+
+    private fun clearManagedConfig() {
+        if (!store.sessionManaged) return
+        store.baseUrl = ""
+        store.token = ""
+        store.sessionManaged = false
+        _state.update { it.copy(config = Config(), connection = ConnectionState.NotConfigured) }
     }
 
     // ---------------- 表单 ----------------

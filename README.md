@@ -27,14 +27,26 @@
 | `scripts/extract_notebook.py` | 把 ipynb 抽成 .py 供 `colab exec` 联调 |
 | `scripts/e2e_check.py` | PC 侧端到端验收（health→info→提交→出图→下载→WS） |
 
-## 手机端使用流程
+## 手机端使用流程（一键模式，推荐）
+
+1. **登录一次**：设置页「Colab 一键启动」→ 登录 Google（浏览器授权，把授权码粘贴回来）。
+2. **一键启动**：点「一键启动 Colab T4」。App 会自动：复用/申请 T4 会话 → 在 Colab kernel 里执行部署脚本
+   （`assets/colab_deploy.py`，装 ComfyUI + 下载 base 模型 + 起网关 + Cloudflare 隧道）→ 解析 PAIR → 自动完成配对。
+   首次 3-5 分钟，已部署过的会话几秒完成；进度和部署日志在设置页实时显示。
+3. **生成**：回生成页写提示词 → 生成。App 每 4 分钟自动给 kernel 发心跳保活；不用时点「停止会话」释放。
+
+> 一键模式协议移植自 Google 开源的 [google-colab-cli](https://github.com/googlecolab/google-colab-cli)：
+> OAuth（installed-app client + PKCE）→ `colab.research.google.com/tun/m/assign` 申请 T4 →
+> `runtimeProxyInfo` → Jupyter kernel WebSocket 执行代码。手机需要能访问 Google（代理/VPN）。
+
+## 备用：手动配对（笔记本模式）
 
 1. **起服务端**：手机浏览器 / Colab App 打开 `anima_colab.ipynb` →「全部运行」。
    首次会装 ComfyUI + 下载 base 模型（约 5.3GB，3-5 分钟），跑完最后打印：
    ```
    PAIR: https://xxxx.trycloudflare.com|<token>
    ```
-2. **配对**：App「设置 → 粘贴配对信息」，长按粘贴整行 →「保存并连接」。
+2. **配对**：App「设置 → 手动配对（备用）→ 粘贴配对信息」，长按粘贴整行 →「保存并连接」。
 3. **生成**：写提示词 → 选参数 → 生成。base 1024² / 30 步 / CFG 4.5 在 T4 上约 70-90 秒。
 4. **看图**：生成完成直接显示；「图库」里能看到服务器历史，支持保存到相册 / 分享 / 参数填回。
 5. **写提示词**：「速查」页有 295 个中文分类 Danbooru tag、10 套模板、常用片段与负向预设，点一下就插入。

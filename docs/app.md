@@ -29,6 +29,24 @@ ui/
   Components.kt     通用组件 + NetworkImage
 ```
 
+## 一键启动 Colab（colab/ 包）
+
+```
+colab/
+  ColabApi.kt            assignments API：list / assign(GET xsrf→POST) / unassign / notebookHash
+  JupyterKernelClient.kt runtime REST（create/delete kernel）+ Jupyter WebSocket execute（流式 stdout）
+  GoogleAuth.kt          Google OAuth（PKCE + remote 授权码流程）+ token 自动刷新 + 本地存储
+  ColabSessionStore.kt   一键会话持久化（endpoint/kernel/proxy token/PAIR，App 重启可复用）
+  ColabSessionManager.kt 状态机：复用或申请 T4 → 建 kernel → 执行 assets/colab_deploy.py
+                         → 解析 PAIR → 写入 ConfigStore → 4 分钟心跳保活 → 停止时 unassign
+```
+
+流程：设置页点「一键启动 Colab T4」→ `ColabSessionManager.start()` →
+`ColabApi.listAssignments()`（优先复用持久化的 endpoint，其次任意 T4）→ 无则 `assign(new nbh, T4)` →
+`JupyterKernelClient.createKernel()` → `execute(部署脚本)`（`onStream` 实时把 `[deploy]` 行推给 UI）→
+正则解析 `PAIR: <url>|<token>` → 写入配对 → `connect()`。
+停止会话：删 kernel + `unassign(endpoint)` + 清空本地会话；若是自动写入的配对会一并清除（手动配对不受影响）。
+
 ## 生成流程
 
 1. `GenerateScreen` 表单 → `AppViewModel.generate()`

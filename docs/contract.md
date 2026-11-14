@@ -189,6 +189,22 @@ App 里用户保存的自定义模板存本地（不进 assets）。
 6. 失败时输出明确原因（torch 不可用 / 下载失败 / 端口占用 / cloudflared 缺失）与重跑方式。
 7. 只在 VM 内跑正常内容（Colab 内容政策）。
 
+## 9. 一键模式（App 内置，v2）
+
+App 不再依赖用户手动运行 notebook：服务端逻辑变成一份可在 Colab kernel 里直接执行的脚本
+`colab/deploy_script.py`（== App 的 `assets/colab_deploy.py`），协议链路（已实测）：
+
+1. OAuth：google-colab-cli 的 installed-app client + PKCE；授权码换 token，refresh_token 自动刷新。
+2. `GET https://colab.research.google.com/tun/m/assignments?authuser=0` 列出会话。
+3. 无会话则 `GET/POST /tun/m/assign?nbh=<web-safe-base64-uuid>&variant=GPU&accelerator=T4&authuser=0`（POST 头 `X-Goog-Colab-Token`）。
+4. `runtimeProxyInfo` 给 `url` + `token`；`POST {url}/api/kernels {"name":"python3","path":null}` 建 kernel。
+5. `wss://{host}/api/kernels/{id}/channels?session_id=<hex32>&token=<proxyToken>`，Jupyter default 协议（JSON 文本帧，含 `channel` 字段），
+   `execute_request` 执行部署脚本，流式收 stdout；同时收 `execute_reply` + `iopub idle` 判定结束。
+6. 从输出正则解析 `PAIR: <url>|<token>` → 走 §3/§4 原配对接口连网关。
+7. 保活：Ready 状态下每 4 分钟执行一次 `print('[app] keepalive')`；停止时删 kernel + `unassign`。
+
+服务端公开接口（§4）不变；notebook（`colab/anima_colab.ipynb`）保留为备用方案。
+
 ## 8. 联调约定
 
 - 服务端测试环境：`colab new --gpu T4 -s anima` + 把 notebook 代码单元抽成脚本用 `colab exec -f` 跑（本地 `scripts/extract_notebook.py`）。

@@ -1,5 +1,7 @@
 package com.tom.animacolab
 
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -27,6 +29,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.DisposableEffect
 import androidx.lifecycle.Lifecycle
@@ -53,6 +56,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun AnimaApp(vm: AppViewModel = viewModel()) {
     val state by vm.state.collectAsStateWithLifecycle()
+    val context = LocalContext.current
     var tab by rememberSaveable { mutableIntStateOf(0) }
     val snackbar = remember { SnackbarHostState() }
 
@@ -63,6 +67,16 @@ fun AnimaApp(vm: AppViewModel = viewModel()) {
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    LaunchedEffect(state.authUrlToOpen) {
+        val url = state.authUrlToOpen ?: return@LaunchedEffect
+        vm.consumeAuthUrl()
+        runCatching {
+            context.startActivity(
+                Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            )
+        }.onFailure { vm.message("没有可用的浏览器打开授权页，请复制链接手动打开") }
     }
 
     LaunchedEffect(state.message) {

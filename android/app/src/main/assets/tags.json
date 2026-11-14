@@ -62,10 +62,6 @@
           "zh": "呆毛"
         },
         {
-          "en": "bangs",
-          "zh": "刘海"
-        },
-        {
           "en": "blunt bangs",
           "zh": "齐刘海"
         },
@@ -98,8 +94,8 @@
           "zh": "发夹"
         },
         {
-          "en": "silver hair",
-          "zh": "银发"
+          "en": "grey hair",
+          "zh": "灰发"
         },
         {
           "en": "blonde hair",
@@ -220,7 +216,7 @@
           "zh": "闪亮眼眸"
         },
         {
-          "en": "tearful eyes",
+          "en": "teary eyes",
           "zh": "含泪眼眸"
         },
         {
@@ -276,8 +272,8 @@
           "zh": "看向镜头"
         },
         {
-          "en": "looking away",
-          "zh": "移开视线"
+          "en": "looking to the side",
+          "zh": "视线偏向一侧"
         },
         {
           "en": "looking back",
@@ -708,10 +704,6 @@
           "zh": "学校走廊"
         },
         {
-          "en": "music room",
-          "zh": "音乐室"
-        },
-        {
           "en": "clubroom",
           "zh": "社团活动室"
         },
@@ -824,10 +816,6 @@
           "zh": "樱花"
         },
         {
-          "en": "night sky",
-          "zh": "夜空"
-        },
-        {
           "en": "starry sky",
           "zh": "星空"
         },
@@ -894,10 +882,6 @@
           "zh": "逆光"
         },
         {
-          "en": "rim light",
-          "zh": "轮廓光"
-        },
-        {
           "en": "cinematic lighting",
           "zh": "电影感光照"
         },
@@ -912,10 +896,6 @@
         {
           "en": "warm lighting",
           "zh": "暖光"
-        },
-        {
-          "en": "cold lighting",
-          "zh": "冷光"
         },
         {
           "en": "neon lights",
@@ -1004,8 +984,8 @@
           "zh": "官方图"
         },
         {
-          "en": "light novel illustration",
-          "zh": "轻小说插画"
+          "en": "light novel",
+          "zh": "轻小说"
         },
         {
           "en": "digital painting",
@@ -1018,10 +998,6 @@
         {
           "en": "concept art",
           "zh": "概念艺术"
-        },
-        {
-          "en": "illustration",
-          "zh": "插画"
         },
         {
           "en": "sketch",
@@ -1070,10 +1046,6 @@
         {
           "en": "year 2020",
           "zh": "2020 年"
-        },
-        {
-          "en": "year 2015",
-          "zh": "2015 年"
         }
       ]
     },
@@ -1189,8 +1161,8 @@
           "artist": true
         },
         {
-          "en": "@krenz cushart",
-          "zh": "画师 Krenz Cushart",
+          "en": "@krenz",
+          "zh": "画师 Krenz",
           "artist": true
         },
         {

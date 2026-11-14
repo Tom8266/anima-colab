@@ -154,12 +154,19 @@ def main(argv=None):
     payload = {"prompt": graph, "client_id": client_id}
     submit_at = time.time()
     resp = session.post(url + "/prompt", json=payload, headers=headers, proxies=proxies, timeout=60)
-    prompt_resp = resp.json() if resp.headers.get("Content-Type", "").startswith("application/json") else {}
+    prompt_resp = {}
+    if resp.headers.get("Content-Type", "").startswith("application/json"):
+        try:
+            prompt_resp = resp.json()
+        except ValueError:
+            prompt_resp = {}
     prompt_id = prompt_resp.get("prompt_id")
     record("prompt", resp.status_code == 200 and bool(prompt_id),
-           "HTTP %s prompt_id=%s node_errors=%s"
-           % (resp.status_code, prompt_id, prompt_resp.get("node_errors")))
-    summary["prompt_response"] = {"status": resp.status_code, "body": prompt_resp}
+           "HTTP %s prompt_id=%s node_errors=%s body=%s"
+           % (resp.status_code, prompt_id, prompt_resp.get("node_errors"),
+              resp.text[:300] if resp.status_code != 200 else ""))
+    summary["prompt_response"] = {"status": resp.status_code, "body": prompt_resp,
+                                  "raw_text": resp.text[:2000]}
     if not prompt_id:
         return finish(summary, out_dir, stamp, started)
 

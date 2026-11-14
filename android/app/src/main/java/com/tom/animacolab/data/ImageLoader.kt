@@ -19,11 +19,17 @@ class ImageLoader(private val client: ComfyClient) {
         override fun sizeOf(key: String, value: Bitmap): Int = value.byteCount
     }
 
+    /** 原始 PNG 字节缓存：同一张图在缩略图/结果卡/大图三种尺寸间复用，避免重复走隧道下载 */
+    private val rawBytes = object : LruCache<String, ByteArray>(24 * 1024 * 1024) {
+        override fun sizeOf(key: String, value: ByteArray): Int = value.size
+    }
+
     suspend fun load(url: String, token: String, targetW: Int = 0, targetH: Int = 0): Bitmap? =
         withContext(Dispatchers.IO) {
             val key = "$url|$targetW|$targetH"
             memory.get(key)?.let { return@withContext it }
-            val bytes = runCatching { client.getBytes(url, token) }.getOrNull() ?: return@withContext null
+            val bytes = rawBytes.get(url) ?: runCatching { client.getBytes(url, token) }
+                .getOrNull()?.also { rawBytes.put(url, it) } ?: return@withContext null
             val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
             BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
             val opts = BitmapFactory.Options().apply {
@@ -33,6 +39,12 @@ class ImageLoader(private val client: ComfyClient) {
             memory.put(key, bmp)
             bmp
         }
+
+    /** 预取图片字节到缓存（成功出图后调用，图库/大图就不用再慢慢下载） */
+    suspend fun prefetch(url: String, token: String) = withContext(Dispatchers.IO) {
+        if (rawBytes.get(url) != null) return@withContext
+        runCatching { client.getBytes(url, token) }.getOrNull()?.let { rawBytes.put(url, it) }
+    }
 
     private fun sampleSize(w: Int, h: Int, targetW: Int, targetH: Int): Int {
         if (w <= 0 || h <= 0 || targetW <= 0 || targetH <= 0) return 1

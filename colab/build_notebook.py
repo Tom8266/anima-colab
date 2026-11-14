@@ -95,7 +95,8 @@ CLOUDFLARED_URL = (
 
 
 def log(message):
-    print("[%s] %s" % (time.strftime("%H:%M:%S"), message), flush=True)
+    # "[deploy]" prefix is what the App's kernel-output parser looks for.
+    print("[deploy] %s %s" % (time.strftime("%H:%M:%S"), message), flush=True)
 
 
 def tail(path, lines=30):
@@ -191,22 +192,33 @@ CODE_ENV = r'''# ===============================================================
 print("=" * 70)
 print("步骤 1/4：检查 Colab 运行环境（需要 GPU / T4）")
 print("=" * 70)
-try:
-    import torch
-except Exception as exc:
-    raise RuntimeError(
-        "torch 不可用（%r）。请确认「运行时 → 更改运行时类型」选择 GPU（T4），"
-        "然后重新「全部运行」。" % (exc,)
-    )
 
-log("torch %s / CUDA %s" % (torch.__version__, getattr(torch.version, "cuda", None)))
-if not torch.cuda.is_available():
-    raise RuntimeError(
-        "没有检测到 GPU。当前运行时不是 GPU 运行时，请在「运行时 → 更改运行时类型 → "
-        "T4 GPU」后重新「全部运行」。"
-    )
-gpu_name = torch.cuda.get_device_name(0)
-vram_gb = round(torch.cuda.get_device_properties(0).total_memory / 1024 ** 3, 1)
+
+def gpu_info():
+    # Deliberately avoid importing torch in the kernel: nvidia-smi is enough,
+    # so the App's deploy kernel keeps a small memory footprint.
+    try:
+        proc = subprocess.run(
+            ["nvidia-smi", "--query-gpu=name,memory.total",
+             "--format=csv,noheader,nounits"],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=15,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise RuntimeError(
+            "nvidia-smi 不可用（%r）。请确认「运行时 → 更改运行时类型」选择 GPU（T4），"
+            "然后重新运行。" % (exc,)
+        )
+    if proc.returncode != 0 or not proc.stdout.strip():
+        raise RuntimeError(
+            "没有检测到 GPU（nvidia-smi 失败：%s）。当前运行时不是 GPU 运行时，"
+            "请在「运行时 → 更改运行时类型 → T4 GPU」后重试。"
+            % (proc.stderr or "").strip()[:300]
+        )
+    parts = [part.strip() for part in proc.stdout.strip().splitlines()[0].split(",")]
+    return parts[0], float(parts[1]) / 1024.0
+
+
+gpu_name, vram_gb = gpu_info()
 log("GPU: %s / 显存 %.1f GB" % (gpu_name, vram_gb))
 if "T4" not in gpu_name:
     log("提示: 本方案只针对 T4 验证过（--force-fp16），其它 GPU 可能也能跑。")
@@ -389,8 +401,12 @@ print("=" * 70)
 
 '''
 CODE_GATEWAY_TAIL = r'''
+import hashlib
+
 GATEWAY_PY.write_text(GATEWAY_SRC, encoding="utf-8")
-log("网关源码已写入: %s (%d bytes)" % (GATEWAY_PY, len(GATEWAY_SRC)))
+gateway_hash = hashlib.sha256(GATEWAY_SRC.encode("utf-8")).hexdigest()
+log("网关源码已写入: %s (%d bytes, sha256 %s)"
+    % (GATEWAY_PY, len(GATEWAY_SRC), gateway_hash[:12]))
 
 # token：同一会话内重复运行会复用，避免已配对的 App 失效；新会话重新生成。
 token = ""
@@ -411,9 +427,14 @@ def gateway_ready():
         return False
 
 
-if gateway_ready():
-    log("网关已在运行（token 一致），跳过启动")
+hash_file = CONTENT / ".anima_gateway_hash"
+previous_hash = hash_file.read_text(encoding="utf-8").strip() if hash_file.exists() else ""
+
+if gateway_ready() and previous_hash == gateway_hash:
+    log("网关已在运行（token 与源码一致），跳过启动")
 else:
+    if gateway_ready():
+        log("网关源码已更新，重启网关加载新代码")
     kill_matching("anima_gateway.py")
     log_handle = open(GATEWAY_LOG, "ab")
     subprocess.Popen(
@@ -426,6 +447,7 @@ else:
     if not wait_until("本地网关 /anima/v1/health comfy=true", gateway_ready, timeout=60):
         print(tail(GATEWAY_LOG, 30))
         raise RuntimeError("网关启动失败（见上方 gateway.log）。修复后重跑本 cell。")
+    hash_file.write_text(gateway_hash, encoding="utf-8")
     log("网关已就绪: " + GATEWAY_URL)
 '''
 CODE_GATEWAY = (
@@ -652,3 +674,36 @@ for index, cell in enumerate(cells):
 
 OUT.write_text(json.dumps(notebook, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
 print("wrote %s (%d cells, %d bytes)" % (OUT, len(cells), OUT.stat().st_size))
+
+# ---------------------------------------------------------------------------
+# Single-file deploy script for the App "one-key" flow: exactly the same code
+# cells as the notebook (minus status/keepalive), sent as one execute_request
+# to a Colab kernel. Self-contained: the gateway source is already inlined.
+# ---------------------------------------------------------------------------
+deploy_header = '''#!/usr/bin/env python3
+"""Anima Colab T4 one-file deployment script (runs inside the Colab kernel).
+
+Self-contained: installs ComfyUI + anima-base + qwen TE/VAE, starts ComfyUI,
+starts the token-auth gateway and a Cloudflare quick tunnel, then prints
+
+    PAIR: https://<random>.trycloudflare.com|<token>
+
+How the App uses it:
+    POST /api/kernels -> WS /api/kernels/<id>/channels -> execute_request with
+    this file's source -> stream stdout -> regex the "PAIR:" line.
+    (See colab/phone_bootstrap.py for a working reference implementation.)
+
+Idempotent: re-running reuses /content, running processes and the existing
+tunnel/token, so the printed PAIR stays the same.
+"""
+'''
+deploy_bodies = [
+    cell["source"].rstrip()
+    for cell in cells[2:9]
+    if cell["type"] == "code"
+]
+deploy_text = deploy_header + "\n" + "\n\n".join(deploy_bodies) + "\n"
+compile(deploy_text, "colab/deploy_script.py", "exec")
+DEPLOY_OUT = ROOT / "colab" / "deploy_script.py"
+DEPLOY_OUT.write_text(deploy_text, encoding="utf-8")
+print("wrote %s (%d bytes)" % (DEPLOY_OUT, DEPLOY_OUT.stat().st_size))

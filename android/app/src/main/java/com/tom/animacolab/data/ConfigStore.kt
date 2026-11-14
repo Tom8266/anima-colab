@@ -18,6 +18,11 @@ class ConfigStore(context: Context) {
         get() = sp.getString("token", "").orEmpty()
         set(v) = sp.edit().putString("token", v.trim()).apply()
 
+    /** 当前配对是否由「一键启动 Colab」自动写入（停止会话时可安全清除） */
+    var sessionManaged: Boolean
+        get() = sp.getBoolean("session_managed", false)
+        set(v) = sp.edit().putBoolean("session_managed", v).apply()
+
     /** 稳定的客户端 id，用于 ComfyUI WebSocket 路由 */
     val clientId: String
         get() {

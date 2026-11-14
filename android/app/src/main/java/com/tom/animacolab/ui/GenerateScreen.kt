@@ -38,6 +38,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -57,6 +58,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -66,6 +68,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tom.animacolab.AppViewModel
 import com.tom.animacolab.UiState
+import com.tom.animacolab.colab.ColabSessionManager
 import com.tom.animacolab.data.ConnectionState
 import com.tom.animacolab.data.JobState
 import com.tom.animacolab.data.PromptBuilder
@@ -109,12 +112,12 @@ fun GenerateScreen(vm: AppViewModel, state: UiState, onNavigate: (Int) -> Unit) 
         Spacer(Modifier.height(10.dp))
 
         if (state.connection is ConnectionState.NotConfigured) {
-            SetupCard(onOpenSettings = { onNavigate(3) })
+            OneTapCard(state, vm, onOpenSettings = { onNavigate(3) }, context = LocalContext.current)
             Spacer(Modifier.height(20.dp))
         } else {
             val error = state.connection as? ConnectionState.Error
             if (error != null) {
-                ErrorCard(error.message) { vm.connect() }
+                ErrorCard(error.message, state, vm, onOpenSettings = { onNavigate(3) })
                 Spacer(Modifier.height(10.dp))
             }
             ModelSelector(state, vm)
@@ -148,10 +151,12 @@ private fun HeaderRow(state: UiState, vm: AppViewModel, onOpenSettings: () -> Un
         Column(Modifier.weight(1f)) {
             Text("Anima Colab", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = TextPrimary)
             Text(
-                when (state.connection) {
-                    is ConnectionState.Ready -> vm.serverSummary() + " · 队列 ${state.serverQueue.running + state.serverQueue.pending}"
-                    is ConnectionState.Checking -> "正在连接 Colab…"
-                    is ConnectionState.Error -> "连接异常"
+                when {
+                    state.session is ColabSessionManager.State.Starting -> "正在准备 Colab 会话…"
+                    state.session is ColabSessionManager.State.Deploying -> "启动中：" + (state.session as ColabSessionManager.State.Deploying).stage
+                    state.connection is ConnectionState.Ready -> vm.serverSummary() + " · 队列 ${state.serverQueue.running + state.serverQueue.pending}"
+                    state.connection is ConnectionState.Checking -> "正在连接 Colab…"
+                    state.connection is ConnectionState.Error -> "连接异常"
                     else -> "未配对"
                 },
                 style = MaterialTheme.typography.labelSmall,
@@ -168,7 +173,13 @@ private fun HeaderRow(state: UiState, vm: AppViewModel, onOpenSettings: () -> Un
 
             is ConnectionState.Checking -> CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp, color = Primary)
             is ConnectionState.Error -> StatusPill("连接失败", ErrorColor)
-            else -> StatusPill("未配对", WarningColor)
+            else -> {
+                if (state.session is ColabSessionManager.State.Starting || state.session is ColabSessionManager.State.Deploying) {
+                    StatusPill("启动中", WarningColor)
+                } else {
+                    StatusPill("未配对", WarningColor)
+                }
+            }
         }
         IconButton(onClick = onOpenSettings) {
             Icon(Icons.Filled.Settings, contentDescription = "设置", tint = TextSecondary)
@@ -188,30 +199,119 @@ fun StatusPill(text: String, color: Color) {
 }
 
 @Composable
-private fun SetupCard(onOpenSettings: () -> Unit) {
-    SectionCard(title = "先把 Colab 跑起来") {
-        Text(
-            "1. 在手机浏览器 / Colab App 打开 Anima 笔记本\n" +
-                "2. 点「全部运行」，等它下载模型并打印 PAIR 行（首次约 3-5 分钟）\n" +
-                "3. 复制 PAIR 整行，到设置里粘贴并测试连接",
-            style = MaterialTheme.typography.bodySmall,
-            color = TextSecondary,
-            lineHeight = 20.sp,
-        )
-        Spacer(Modifier.height(12.dp))
-        Button(onClick = onOpenSettings, modifier = Modifier.fillMaxWidth()) {
-            Text("去粘贴配对信息")
+private fun OneTapCard(
+    state: UiState,
+    vm: AppViewModel,
+    onOpenSettings: () -> Unit,
+    context: android.content.Context,
+) {
+    val session = state.session
+    val busy = session is ColabSessionManager.State.Starting || session is ColabSessionManager.State.Deploying
+    SectionCard(title = if (busy) "正在启动 Colab" else "连接 Colab") {
+        when (session) {
+            is ColabSessionManager.State.Starting -> {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = Primary)
+                    Spacer(Modifier.width(8.dp))
+                    Text("准备会话中…", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                }
+            }
+
+            is ColabSessionManager.State.Deploying -> {
+                Text(session.stage, style = MaterialTheme.typography.bodySmall, color = TextPrimary)
+                Spacer(Modifier.height(8.dp))
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth(), color = Primary)
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    "首次约 3-5 分钟，App 会自动完成部署和配对；可以先切到后台。",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = TextSecondary,
+                    lineHeight = 16.sp,
+                )
+                val tail = state.deployLogs.takeLast(3)
+                if (tail.isNotEmpty()) {
+                    Spacer(Modifier.height(6.dp))
+                    tail.forEach { line ->
+                        Text(
+                            line,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = TextSecondary,
+                            fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                            fontSize = 10.sp,
+                            maxLines = 1,
+                        )
+                    }
+                }
+                Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
+                    TextButton(onClick = vm::cancelColabStart) { Text("取消", color = ErrorColor) }
+                }
+            }
+
+            is ColabSessionManager.State.Failed -> {
+                Text(session.message, style = MaterialTheme.typography.bodySmall, color = ErrorColor, lineHeight = 18.sp)
+                Spacer(Modifier.height(10.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = vm::startColabSession, modifier = Modifier.weight(1f)) { Text("重新启动") }
+                    OutlinedButton(onClick = onOpenSettings, modifier = Modifier.weight(1f)) { Text("去设置") }
+                }
+            }
+
+            else -> {
+                if (!state.googleLoggedIn) {
+                    Text(
+                        "登录 Google 后可以一键启动 Colab T4：App 自动创建会话、部署 ComfyUI + Anima、自动完成配对。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextSecondary,
+                        lineHeight = 20.sp,
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    Button(onClick = vm::beginGoogleLogin, modifier = Modifier.fillMaxWidth()) { Text("登录 Google") }
+                    Spacer(Modifier.height(6.dp))
+                    TextButton(onClick = {
+                        val clip = readClipboard(context)
+                        if (clip.isBlank()) vm.message("剪贴板里没有授权码") else vm.completeGoogleLogin(clip)
+                    }) { Text("已复制授权码？点这里完成登录") }
+                    TextButton(onClick = onOpenSettings) { Text("手动配对（备用）") }
+                } else {
+                    Text(
+                        "点一下自动创建 Colab T4、部署 ComfyUI + Anima、完成配对（首次约 3-5 分钟）。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = TextSecondary,
+                        lineHeight = 20.sp,
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    Button(onClick = vm::startColabSession, modifier = Modifier.fillMaxWidth()) { Text("一键启动 Colab T4") }
+                    TextButton(onClick = onOpenSettings) { Text("手动配对（备用）") }
+                }
+            }
         }
     }
 }
 
 @Composable
-private fun ErrorCard(message: String, onRetry: () -> Unit) {
+private fun ErrorCard(message: String, state: UiState, vm: AppViewModel, onOpenSettings: () -> Unit) {
     SectionCard(title = "连接问题") {
-        Text(message, style = MaterialTheme.typography.bodySmall, color = ErrorColor)
+        Text(message, style = MaterialTheme.typography.bodySmall, color = ErrorColor, lineHeight = 18.sp)
         Spacer(Modifier.height(8.dp))
-        OutlinedButton(onClick = onRetry) { Text("重试") }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = vm::connect) { Text("重试连接") }
+            if (state.googleLoggedIn) {
+                Button(onClick = vm::startColabSession) { Text("一键重启 Colab") }
+            } else {
+                OutlinedButton(onClick = onOpenSettings) { Text("去设置") }
+            }
+        }
     }
+}
+
+private fun readClipboard(context: android.content.Context): String {
+    val cm = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
+        ?: return ""
+    val clip = cm.primaryClip ?: return ""
+    return (0 until clip.itemCount)
+        .mapNotNull { clip.getItemAt(it).coerceToText(context)?.toString() }
+        .joinToString("\n")
+        .trim()
 }
 
 @Composable

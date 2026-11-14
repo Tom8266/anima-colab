@@ -16,6 +16,7 @@ import asyncio
 import hmac
 import json
 import os
+import re
 import subprocess
 import sys
 import urllib.parse
@@ -83,6 +84,13 @@ def _probe_device():
         _device_cache["vram_total_gb"] = round(float(mem_mb) / 1024.0, 1)
     except Exception:
         pass
+
+
+def _clean_device_name(raw):
+    """ComfyUI may report e.g. "cuda:0 Tesla T4 : cudaMallocAsync"."""
+    name = re.sub(r"^cuda:\d+\s+", "", str(raw or "")).strip()
+    name = re.sub(r"\s*:\s*cudaMallocAsync.*$", "", name, flags=re.IGNORECASE).strip()
+    return name
 
 
 def _size_gb(sub, name):
@@ -270,8 +278,9 @@ async def handle_health(request):
     payload["comfy"] = True
     devices = stats.get("devices") or []
     if devices and isinstance(devices[0], dict):
-        raw = str(devices[0].get("name") or "")
-        payload["device"] = raw.split(":", 1)[-1].strip() if ":" in raw else raw
+        cleaned = _clean_device_name(devices[0].get("name"))
+        if cleaned:
+            payload["device"] = cleaned
         vram = devices[0].get("vram_total")
         if isinstance(vram, (int, float)) and vram > 0:
             payload["vram_total_gb"] = round(vram / 1024 ** 3, 1)
@@ -346,8 +355,13 @@ async def _forward_json(request, path, method="GET"):
             **kwargs,
         ) as resp:
             body = await resp.read()
-            content_type = resp.headers.get("Content-Type", "application/json")
-            return web.Response(status=resp.status, body=body, content_type=content_type)
+            # ComfyUI sends "application/json; charset=utf-8" -- pass it as a
+            # raw header, aiohttp rejects charset in the content_type argument.
+            headers = {
+                "Content-Type": resp.headers.get("Content-Type", "application/json"),
+                "Cache-Control": "no-store",
+            }
+            return web.Response(status=resp.status, body=body, headers=headers)
     except _UpstreamError as exc:
         return _comfy_error(exc)
     except (ClientError, asyncio.TimeoutError, OSError):
