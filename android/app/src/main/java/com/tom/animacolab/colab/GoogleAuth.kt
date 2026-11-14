@@ -215,9 +215,17 @@ class GoogleAuth(private val store: GoogleAuthStore) {
             if (text.isEmpty()) return ""
             val m = Regex("[?&]code=([^&\\s]+)").find(text)
             if (m != null) return java.net.URLDecoder.decode(m.groupValues[1], "UTF-8")
-            val candidate = text.lines().map { it.trim() }.filter { it.isNotEmpty() }
-                .firstOrNull { it.length in 10..2048 && !it.contains(" ") && !it.startsWith("http") && !it.startsWith("PAIR") }
-            return candidate.orEmpty()
+            return text.lines()
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
+                .map { line ->
+                    line.removePrefix("PAIR:").removePrefix("PAIR：")
+                        .removePrefix("code:").removePrefix("Code:")
+                        .removePrefix("授权码:").removePrefix("授权码：")
+                        .trim()
+                }
+                .firstOrNull { it.length in 10..2048 && !it.contains(" ") && !it.startsWith("http") }
+                .orEmpty()
         }
 
         fun verifyRedirect(url: String): Boolean = url.startsWith(REDIRECT_URI)

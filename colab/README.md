@@ -101,6 +101,8 @@ python3 colab/e2e_check.py --pair-file /tmp/pair.txt --out-dir outputs \
 - 免费 Colab 单会话 1-3 小时、`/content` 随会话清空；掉线后重跑一键流程会重新下载模型
   （约 3-4 分钟）并生成新 PAIR。
 - 仅验证 T4（`--force-fp16`）；TPU 留到 v2（契约 §1）。
-- 网关 WS 在部分受限网络（本开发机 Wi-Fi）直连不可靠：App 已有 `/history` 轮询兜底
-  （见 `docs/app.md`），服务端无需改动。
+- 网关 WS 已验证可用：App 实机（手机 OkHttp WS 经 Cloudflare）能正常收到
+  `progress` / `executed` / `execution_success`（App 另有 `/history` 轮询兜底）。
+  仅本开发机 PC 直连 `wss://*.trycloudflare.com` 会被网络掐断，PC 验收脚本加
+  `--proxy http://127.0.0.1:7890` 即可——是本机网络限制，不是服务端/App 问题。
 - Cloudflare 快速隧道 URL 每次随机，token 是唯一鉴权凭据，切勿外泄。

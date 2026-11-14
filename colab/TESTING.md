@@ -78,17 +78,18 @@ PAIR: https://privileges-package-wilson-west.trycloudflare.com|wJpI...mpoP
   `"0 Tesla T4 : cudaMallocAsync"`（ComfyUI `/system_stats` 的原始 name），
   现输出 `"Tesla T4"`；`vram_total_gb=14.6`。
 
-### 3.2 网关 WS 是好的，客户端网络限制导致直连失败（App 需降级兜底）
+### 3.2 网关 WS 正常；仅本机 PC 直连 Cloudflare WS 被网络掐断
 
-- 本机（PC，与手机同 Wi-Fi）直连 `wss://<tunnel>/ws`：`TimeoutError: timed out during
-  opening handshake`（25s），**经本机代理 127.0.0.1:7890 则 6.2s 握手成功**。
+- 本机（PC）直连 `wss://<tunnel>/ws`：`TimeoutError: timed out during opening handshake`
+  （25s）；经本机代理 127.0.0.1:7890 则 6.2s 握手成功。
 - 从 Colab VM 内部验证：`ws://127.0.0.1:8081/ws` 直连 **CONNECTED**，
   `wss://<tunnel>/ws` 经 Cloudflare **CONNECTED**，首帧
   `{"type":"status","data":{"status":{"exec_info":{"queue_remaining":0}},"sid":"..."}}`；
   未带 token 的 WS 正确返回 401。
-- 结论：网关 WS 双向透传正常（aiohttp 实测），但本机对 `*.trycloudflare.com` 的
-  WebSocket 直连被网络环境掐断。**App 端建议：WS 失败时降级轮询 `/anima/v1/queue`
-  与 `/anima/v1/history`，或提示切换网络**；HTTP 全链路不受影响。
+- **App 实机复核（Lead，2026-11-14 晚）**：手机 OkHttp WS 经 Cloudflare 正常收到
+  `progress`（两轮实测推进到 15/30、28/30）、`executed`、`execution_success`。
+  结论：网关 WS 双向透传完全正常；只有本开发机 PC 的 Python/代理链路直连握手失败，
+  属本机网络限制，和 App/服务端无关。PC 侧验收脚本加 `--proxy` 即可，App 无需降级。
 
 ## 4. 契约 §8 第 1 段验收（PC 经公网 tunnel，19 项全过）
 

@@ -204,10 +204,11 @@ X-Colab-Runtime-Proxy-Token: <proxyToken>
    `colab.research.google.com` 直连实测 105.9s 才返回 401（curl 却很快）。
    参考实现给 `--proxy` 时优先走代理。手机 App 应：
    直连 5-10s 超时 → 提示网络/重试，不要静默等 100s。
-6. **trycloudflare 的 WebSocket 在部分网络直连会被掐**：本机（同 Wi-Fi）直连
-   `wss://*.trycloudflare.com` 25s 握手中断；经代理 6.2s 成功；VM 内直连该隧道
-   WS 也成功。**App 端务必给 WS 失败做降级**（例如降级轮询 queue/history 或提示用户换网络）。
-   这是客户端网络问题，不是网关问题（网关 WS 用 aiohttp 客户端验证过双向正常）。
+6. **trycloudflare 的 WebSocket：App 实机正常，本机 PC 直连会被掐**。
+   App（手机 OkHttp WS 经 Cloudflare）实测能正常收 progress/executed/execution_success；
+   本开发机 PC 直连 `wss://*.trycloudflare.com` 25s 握手中断、经代理 6.2s 成功，
+   属本机网络限制（VM 内直连该隧道 WS 也正常）。PC 调试/验收脚本加 `--proxy` 即可，
+   App 保留 history 轮询兜底但不依赖它。
 7. **token.json 写入**：参考实现刷新 access token 后原子写回 `~/.config/colab-cli/token.json`
    （600 权限），保持 colab CLI 仍可用。App 不要写 CLI 文件，用自己的存储。
 8. **不要 unassign 现有会话**：免费账号单会话；App「退出登录/关闭」不要释放 assignment，
