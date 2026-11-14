@@ -123,7 +123,7 @@ fun SettingsScreen(vm: AppViewModel, state: UiState) {
     ) {
         ScreenHeader(title = "设置", subtitle = "外观 · 连接 · 数据")
         Column(Modifier.padding(horizontal = Spacing.screen)) {
-            ColabSection(vm, state, context)
+            ColabSection(vm, state)
             Spacer(Modifier.height(Spacing.lg))
             AppearanceSection(vm, state)
             Spacer(Modifier.height(Spacing.lg))
@@ -174,7 +174,7 @@ private fun heroState(state: UiState): HeroState {
 }
 
 @Composable
-private fun ColabSection(vm: AppViewModel, state: UiState, context: Context) {
+private fun ColabSection(vm: AppViewModel, state: UiState) {
     var showAllLogs by rememberSaveable { mutableStateOf(false) }
     var confirmStop by rememberSaveable { mutableStateOf(false) }
     var confirmLogout by rememberSaveable { mutableStateOf(false) }
@@ -230,7 +230,7 @@ private fun ColabSection(vm: AppViewModel, state: UiState, context: Context) {
         Spacer(Modifier.height(Spacing.lg))
 
         if (!state.googleLoggedIn) {
-            LoggedOutBody(vm = vm, context = context, quiet = quiet)
+            LoggedOutBody(vm = vm, quiet = quiet)
         } else {
             GoogleAccountRow(vm = vm, onLogoutClick = { confirmLogout = true })
             Spacer(Modifier.height(Spacing.md))
@@ -310,7 +310,8 @@ private fun GoogleAccountRow(vm: AppViewModel, onLogoutClick: () -> Unit) {
 
 /** 未登录：登录 Google + 粘贴授权码。 */
 @Composable
-private fun LoggedOutBody(vm: AppViewModel, context: Context, quiet: Color) {
+private fun LoggedOutBody(vm: AppViewModel, quiet: Color) {
+    var showLoginCode by rememberSaveable { mutableStateOf(false) }
     Text(
         "登录 Google 后，App 会自动创建 Colab T4、部署 ComfyUI + Anima、自动完成配对，" +
             "不用再打开 Colab 页面复制 PAIR。",
@@ -328,25 +329,27 @@ private fun LoggedOutBody(vm: AppViewModel, context: Context, quiet: Color) {
     Spacer(Modifier.height(Spacing.sm))
     HeroOutlinedButton(
         text = "粘贴授权码完成登录",
-        onClick = {
-            val clip = readClipboard(context)
-            if (clip.isBlank()) {
-                vm.message("剪贴板里没有内容，先复制 Google 页面上的授权码")
-            } else {
-                vm.completeGoogleLogin(clip)
-            }
-        },
+        onClick = { showLoginCode = true },
         modifier = Modifier.fillMaxWidth(),
         icon = Icons.Outlined.ContentPaste,
     )
     Spacer(Modifier.height(Spacing.sm))
     Text(
         "登录步骤：点「登录 Google」→ 浏览器里选账号并允许 → Google 页面显示一串授权码 → " +
-            "长按复制 → 回到这里点「粘贴授权码完成登录」。只需授权一次。",
+            "长按复制 → 回到这里点「粘贴授权码完成登录」，把授权码粘进输入框。只需授权一次。",
         style = MaterialTheme.typography.labelSmall,
         color = quiet,
         lineHeight = 16.sp,
     )
+    if (showLoginCode) {
+        GoogleLoginCodeDialog(
+            onDismiss = { showLoginCode = false },
+            onSubmit = { code ->
+                showLoginCode = false
+                vm.completeGoogleLogin(code)
+            },
+        )
+    }
 }
 
 /** Starting：分配会话中，可取消。 */

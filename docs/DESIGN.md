@@ -105,7 +105,7 @@ AnimatedChevron(expanded, modifier)
    - 状态行优先级：部署 stage > 连接 Ready（`vm.serverSummary()` + 队列）> 连接中 > 连接异常 > 未配对。
 2. 未配对（`ConnectionState.NotConfigured`）：
    - **Hero 卡**（`ExpressiveCard(shape = AnimaShape.hero)`，`primaryContainer` 背景 + 右侧 `ShapeDecoration`）：
-     - 状态：未登录 → 说明 + “登录 Google” 主按钮 + “已复制授权码？点这里完成登录” 文本按钮 + “手动配对（备用）”。
+     - 状态：未登录 → 说明 + “登录 Google” 主按钮 + “粘贴授权码完成登录” 文本按钮（打开授权码输入弹窗） + “手动配对（备用）”。
      - 已登录 → “一键启动 Colab T4” 主按钮 + 说明 + 手动配对入口。
      - Starting/Deploying → 当前 stage、`LinearWavyProgressIndicator()` 不定态、最近 3 行部署日志（等宽小字）、取消按钮。
      - Failed → 错误信息 + 重新启动 / 去设置。
@@ -155,7 +155,7 @@ AnimatedChevron(expanded, modifier)
 
 `ScreenHeader("设置", subtitle = "外观 · 连接 · 数据")`，按 `SectionLabel` + `ExpressiveCard` 分组：
 
-1. **Colab 一键启动**（Hero 卡，primaryContainer / 状态色装饰）：未登录 → 登录 Google 主按钮 + 粘贴授权码 + 说明；
+1. **Colab 一键启动**（Hero 卡，primaryContainer / 状态色装饰）：未登录 → 登录 Google 主按钮 + 粘贴授权码（弹窗输入）+ 说明；
    已登录 → 账号行（已登录 / 退出）+ 状态机（Starting/Deploying/Ready/Failed/Off）各自内容与按钮（启动/取消/重新连接/停止会话）；
    部署日志折叠展开保留。
 2. **外观**（新）：`SegmentedOptions(["跟随系统","浅色","深色"], index = state.themeMode.ordinal,

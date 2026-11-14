@@ -1,7 +1,5 @@
 package com.tom.animacolab.ui
 
-import android.content.ClipboardManager
-import android.content.Context
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
@@ -101,7 +99,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInWindow
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.KeyboardType
@@ -141,7 +138,6 @@ fun GenerateScreen(vm: AppViewModel, state: UiState, onNavigate: (Int) -> Unit) 
     var confirmInterrupt by remember { mutableStateOf(false) }
     var confirmClear by remember { mutableStateOf(false) }
     val scrollState = rememberScrollState()
-    val context = LocalContext.current
     // 常驻条只在「进度卡完全滚出视口」时出现：记录卡片在滚动内容里的实际位置来判断，
     // 而不是用 atBottom —— 后者在「卡片已可见、只差几像素到底」的过渡位置会同时出现两层进度。
     // 位置只在布局变化时写入状态，滚动本身不触发重组。
@@ -195,7 +191,7 @@ fun GenerateScreen(vm: AppViewModel, state: UiState, onNavigate: (Int) -> Unit) 
             GenerateHeader(state, vm)
             Column(Modifier.padding(horizontal = Spacing.screen)) {
                 if (state.connection is ConnectionState.NotConfigured) {
-                    OneTapHero(state, vm, context = context, onOpenSettings = { onNavigate(3) })
+                    OneTapHero(state, vm, onOpenSettings = { onNavigate(3) })
                     Spacer(Modifier.height(Spacing.xxl))
                 } else {
                     val error = state.connection as? ConnectionState.Error
@@ -449,7 +445,6 @@ private fun AnimaMark() {
 private fun OneTapHero(
     state: UiState,
     vm: AppViewModel,
-    context: Context,
     onOpenSettings: () -> Unit,
 ) {
     val session = state.session
@@ -509,7 +504,7 @@ private fun OneTapHero(
                     else -> if (state.googleLoggedIn) {
                         HeroStartContent(vm::startColabSession, onOpenSettings)
                     } else {
-                        HeroLoginContent(vm, context, onOpenSettings)
+                        HeroLoginContent(vm, onOpenSettings)
                     }
                 }
             }
@@ -539,7 +534,8 @@ private fun HeroEyebrow() {
 }
 
 @Composable
-private fun HeroLoginContent(vm: AppViewModel, context: Context, onOpenSettings: () -> Unit) {
+private fun HeroLoginContent(vm: AppViewModel, onOpenSettings: () -> Unit) {
+    var showLoginCode by rememberSaveable { mutableStateOf(false) }
     HeroTitle("连上云端画布")
     Spacer(Modifier.height(Spacing.sm))
     HeroBody("登录 Google 后，一键创建 Colab T4 会话：自动部署 ComfyUI + Anima 并完成配对。")
@@ -550,14 +546,20 @@ private fun HeroLoginContent(vm: AppViewModel, context: Context, onOpenSettings:
         modifier = Modifier.fillMaxWidth(),
     )
     TextButton(
-        onClick = {
-            val clip = readClipboard(context)
-            if (clip.isBlank()) vm.message("剪贴板里没有授权码") else vm.completeGoogleLogin(clip)
-        },
+        onClick = { showLoginCode = true },
         modifier = Modifier.fillMaxWidth(),
-    ) { Text("已复制授权码？点这里完成登录") }
+    ) { Text("粘贴授权码完成登录") }
     TextButton(onClick = onOpenSettings, modifier = Modifier.fillMaxWidth()) {
         Text("手动配对（备用）")
+    }
+    if (showLoginCode) {
+        GoogleLoginCodeDialog(
+            onDismiss = { showLoginCode = false },
+            onSubmit = { code ->
+                showLoginCode = false
+                vm.completeGoogleLogin(code)
+            },
+        )
     }
 }
 
@@ -1918,16 +1920,6 @@ private fun SaveTemplateDialog(onDismiss: () -> Unit, onSave: (String) -> Unit) 
             TextButton(onClick = onDismiss) { Text("取消") }
         },
     )
-}
-
-/** 读取系统剪贴板（登录授权码 / 配对信息）。 */
-private fun readClipboard(context: Context): String {
-    val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager ?: return ""
-    val clip = cm.primaryClip ?: return ""
-    return (0 until clip.itemCount)
-        .mapNotNull { clip.getItemAt(it).coerceToText(context)?.toString() }
-        .joinToString("\n")
-        .trim()
 }
 
 /** 秒数 → "42s / 1m05s"。 */
