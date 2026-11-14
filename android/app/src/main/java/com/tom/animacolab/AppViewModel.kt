@@ -325,7 +325,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         store.baseUrl = ""
         store.token = ""
         store.sessionManaged = false
-        _state.update { it.copy(config = Config(), connection = ConnectionState.NotConfigured) }
+        _state.update {
+            it.copy(
+                config = Config(),
+                connection = ConnectionState.NotConfigured,
+                info = null,
+                serverQueue = QueueStatus(0, 0),
+            )
+        }
     }
 
     // ---------------- 表单 ----------------

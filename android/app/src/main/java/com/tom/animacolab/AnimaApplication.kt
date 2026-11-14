@@ -35,6 +35,8 @@ class AnimaApplication : Application() {
         sessionManager = ColabSessionManager(this, auth, colabSessionStore, appScope)
         sessionManager.keepaliveEnabled = getSharedPreferences("anima_config", MODE_PRIVATE)
             .getBoolean("background_keepalive", true)
+        // 进程被系统回收/重建后，若本地还有会话与配对，直接恢复保活循环（不依赖界面是否打开）
+        runCatching { sessionManager.resumeIfSessionExists() }
     }
 
     companion object {
