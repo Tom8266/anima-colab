@@ -142,3 +142,28 @@ scripts/device_shots.sh --install --phase full --dim
 2. 在电脑窗口点「生成」，手机端应能提交并看到进度（`adb logcat` 有 WS 日志）；
 3. 熄屏超过 10 分钟，前台服务通知仍在，心跳没有断（一键模式每 4 分钟一次）；
 4. 关闭 scrcpy，手机屏幕自动恢复，亮度/常亮设置未被改坏。
+
+## 8. 侧边栏 phone-mirror 插件（全熄屏）
+
+插件（`plugins/phone-mirror`）的「熄灭屏幕」不再用 `cmd display power-off`（那条会让合成器停摆、
+screenrecord 冻帧、screencap 全黑），而是启动一个短生命周期的 scrcpy holder：
+
+```bash
+scrcpy --no-window --turn-screen-off --stay-awake --no-audio
+```
+
+scrcpy 用 SurfaceControl 只关 HWC 面板电源，DisplayManager 状态保持 ON，合成继续，所以插件原有的
+screenrecord 管道照常出帧、侧边栏画面不中断。点「点亮屏幕」会结束 holder，scrcpy 退出时自动把面板恢复。
+
+实测（M2012K11AC / Android 17）：
+
+- 熄屏后：物理面板 `powerMode=Off`、`screenOff:true`、面板供电保持；点按手机后
+  `msSinceLastFrame` 从 3.3s 降到 0.6s，snapshot 内容随之变化（画面是活的，不是冻帧）。
+- 点亮：`powerMode=On`，流不中断。
+- 依赖：PATH 里的 `scrcpy`，或项目内 `outputs/tools/scrcpy-*/scrcpy`；也可用
+  `PHONE_MIRROR_SCRCPY=/path/to/scrcpy` 指定。找不到时会返回明确错误，不会静默失败。
+
+> 注意：插件重启后侧边栏的 `<img>` 可能停在旧连接上，关掉再打开「手机屏幕」标签即可重新连上。
+
+顺带：`scrcpy` 熄屏时 adb 输入是正常的（录屏帧会随点按变化）；但 `screencap` 只有在同时存在
+ScreenRecorder 虚拟显示时才能取到画面，单独 scrcpy 熄屏时仍为黑。自动截图流水线继续用 `--dim`。
