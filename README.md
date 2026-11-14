@@ -31,6 +31,7 @@
 | `docs/screenshots/redesign/` | 重设计后的真机截图（深/浅色、动态取色、各页面状态） |
 | `docs/colab-setup.md` | Colab 端使用与排错 |
 | `scripts/build.sh` / `install.sh` | 构建 debug APK / adb 安装启动 |
+| `scripts/dev.sh` / `scrcpy-off.sh` | 真机熄屏调试入口 / 独立 scrcpy 窗口 |
 | `scripts/mock_gateway.py` / `device_shots.sh` | 本地 mock 网关 + 真机自动截图（视觉 QA 用，无需 Colab） |
 | `scripts/extract_notebook.py` | 把 ipynb 抽成 .py 供 `colab exec` 联调 |
 | `scripts/e2e_check.py` | PC 侧端到端验收（health→info→提交→出图→下载→WS） |
@@ -98,12 +99,16 @@ scripts/device_shots.sh --install --phase full          # 深/浅色、各页面
 scripts/device_shots.sh --install --phase full --dim    # 同上，面板亮度压到 1（护 AMOLED，截图不受影响）
 ```
 
-不亮屏调试（scrcpy 熄屏镜像、无线调试、熄屏跑长任务）见 [docs/device-debug.md](docs/device-debug.md)；
-本机已装好 scrcpy，直接：
+真机调试默认「熄屏 + 侧边栏镜像」——约定写在 [AGENTS.md](AGENTS.md)，原理与排错见
+[docs/device-debug.md](docs/device-debug.md)：
 
 ```bash
-scripts/scrcpy-off.sh    # 画面镜像到电脑，手机面板保持熄灭（MOD+o 可切换）
+scripts/dev.sh start                # 熄灭手机面板（设备保持唤醒），侧边栏/快照继续出帧
+scripts/dev.sh shot .tmp/shot.jpg   # 面板熄灭也能取当前画面
+scripts/dev.sh stop                 # 点亮面板，结束调试
 ```
+
+需要独立 scrcpy 窗口（不经过侧边栏）时用 `scripts/scrcpy-off.sh`。
 
 单元测试：
 
