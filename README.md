@@ -34,6 +34,8 @@
    （`assets/colab_deploy.py`，装 ComfyUI + 下载 base 模型 + 起网关 + Cloudflare 隧道）→ 解析 PAIR → 自动完成配对。
    首次 3-5 分钟，已部署过的会话几秒完成；进度和部署日志在设置页实时显示。
 3. **生成**：回生成页写提示词 → 生成。App 每 4 分钟自动给 kernel 发心跳保活；不用时点「停止会话」释放。
+4. **后台/通知**：会话期间前台服务常驻通知保活；出图完成自动下载到 App 本地并弹系统通知，
+   点「保存」才写入系统相册（Pictures/AnimaColab）。
 
 > 一键模式协议移植自 Google 开源的 [google-colab-cli](https://github.com/googlecolab/google-colab-cli)：
 > OAuth（installed-app client + PKCE）→ `colab.research.google.com/tun/m/assign` 申请 T4 →

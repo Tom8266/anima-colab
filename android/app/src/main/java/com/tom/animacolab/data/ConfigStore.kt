@@ -18,6 +18,16 @@ class ConfigStore(context: Context) {
         get() = sp.getString("token", "").orEmpty()
         set(v) = sp.edit().putString("token", v.trim()).apply()
 
+    /** 生成完成后自动下载图片到 App 私有存储（不写入系统相册） */
+    var autoDownload: Boolean
+        get() = sp.getBoolean("auto_download", true)
+        set(v) = sp.edit().putBoolean("auto_download", v).apply()
+
+    /** 后台保活（前台服务常驻通知） */
+    var backgroundKeepalive: Boolean
+        get() = sp.getBoolean("background_keepalive", true)
+        set(v) = sp.edit().putBoolean("background_keepalive", v).apply()
+
     /** 当前配对是否由「一键启动 Colab」自动写入（停止会话时可安全清除） */
     var sessionManaged: Boolean
         get() = sp.getBoolean("session_managed", false)

@@ -40,6 +40,11 @@ class ImageLoader(private val client: ComfyClient) {
             bmp
         }
 
+    /** 取原始 PNG 字节（优先命中缓存；自动保存/分享复用同一份，不重复走隧道下载） */
+    suspend fun bytes(url: String, token: String): ByteArray? = withContext(Dispatchers.IO) {
+        rawBytes.get(url) ?: runCatching { client.getBytes(url, token) }.getOrNull()?.also { rawBytes.put(url, it) }
+    }
+
     /** 预取图片字节到缓存（成功出图后调用，图库/大图就不用再慢慢下载） */
     suspend fun prefetch(url: String, token: String) = withContext(Dispatchers.IO) {
         if (rawBytes.get(url) != null) return@withContext

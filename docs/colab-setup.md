@@ -3,9 +3,19 @@
 本文面向**使用者**（手机党）：把 Colab T4 变成自己的 Anima 出图服务器，App 通过 Cloudflare
 快速隧道连接，不依赖电脑、不需要搬 ComfyUI 前端。
 
-- 服务端实现：`colab/anima_colab.ipynb`（一键 notebook）、`colab/gateway.py`（token 鉴权网关）
+- 服务端实现：`colab/deploy_script.py`（App 一键部署载荷）、`colab/anima_colab.ipynb`（备用一键 notebook）、`colab/gateway.py`（token 鉴权网关）
 - 契约：`docs/contract.md`（App ⇄ 网关 ⇄ ComfyUI，接口以它为准）
 - 联调证据：`colab/TESTING.md`
+
+## 0. 两种使用方式
+
+| 方式 | 适用 | 操作 |
+|---|---|---|
+| **App 一键模式（推荐，v2）** | 日常使用 | App 设置页点「一键启动 Colab T4」→ App 自动登录 Google、申请/复用 T4、在 kernel 里执行 `deploy_script.py`（`colab/deploy_script.py`）、自动解析 PAIR 并连接。首次约 3-4 分钟，之后复用已部署 VM 约 10-20 秒。用户**不需要**打开 Colab 网页或复制任何东西。 |
+| **notebook 手动模式（备用）** | 调试 / 没有一键功能的旧版 App | 手机浏览器打开 `colab/anima_colab.ipynb` → 运行时选 T4 → 全部运行 → 长按复制 `PAIR:` 行 → App 设置粘贴。 |
+
+本文第 2、3 节讲手动模式；一键模式的协议/实现细节见
+[`../colab/PHONE_BOOTSTRAP.md`](../colab/PHONE_BOOTSTRAP.md)。
 
 ## 1. 原理（30 秒版）
 
@@ -49,8 +59,10 @@
 
 ## 4. 会话与保活
 
-- notebook 最后一个 cell 是**保活循环**（每 60 秒心跳），防止 Colab 判定闲置回收。
-  **保持该页面打开**（切后台也行，但别关标签页）。
+- **App 一键模式**：App 在 Ready 后每 4 分钟向 kernel 发一条 `print('[app] keepalive')`
+  心跳；点「停止会话」会删 kernel 并 unassign（释放配额）。日常不要手动 unassign。
+- **notebook 备用模式**：最后一个 cell 是保活循环（每 60 秒心跳），保持页面打开即可。
+
 - 免费版限制：
   - 不执行代码约 90 分钟会被回收；保活 cell 就是为此存在。
   - 单次会话总时长通常 1-3 小时（受免费额度/资源池影响），到点会断开。

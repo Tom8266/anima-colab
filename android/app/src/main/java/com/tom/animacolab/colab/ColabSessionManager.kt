@@ -1,6 +1,9 @@
 package com.tom.animacolab.colab
 
 import android.content.Context
+import android.content.Intent
+import androidx.core.content.ContextCompat
+import com.tom.animacolab.Notifications
 import com.tom.animacolab.data.Pairing
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -47,7 +50,11 @@ class ColabSessionManager(
     private var startJob: Job? = null
     private var keepaliveJob: Job? = null
     private var lastError: String? = null
+    private var keepaliveServiceStarted = false
     private val logLock = Any()
+
+    /** 后台保活（前台服务 + 4 分钟心跳）是否开启，由设置页切换 */
+    var keepaliveEnabled: Boolean = true
 
     init {
         store.existingPair()?.let { _pair.value = it }
@@ -173,6 +180,8 @@ class ColabSessionManager(
                 appendLog("已释放 Colab 会话")
             }.onFailure { appendLog("释放会话失败（可能已超时回收）：${it.message}") }
         }
+        stopKeepaliveService()
+        Notifications.cancelSession(context)
         store.clear()
         _pair.value = null
         _state.value = State.Off
@@ -180,6 +189,10 @@ class ColabSessionManager(
 
     /** 会话已就绪时的心跳：每 4 分钟在 kernel 里跑一行代码，防止 Colab 闲置回收 */
     private fun startKeepalive() {
+        keepaliveEnabled.let { enabled ->
+            if (enabled) startKeepaliveService() else stopKeepaliveService()
+        }
+        Notifications.showSessionReady(context)
         keepaliveJob?.cancel()
         keepaliveJob = scope.launch {
             while (isActive) {
@@ -199,16 +212,64 @@ class ColabSessionManager(
                         appendLog("保活心跳 OK（${clockText()}）")
                     } else {
                         appendLog("保活失败，会话可能已断开")
-                        if (_state.value is State.Ready) _state.value = State.Failed("Colab 会话好像断开了，点重新启动")
+                        if (_state.value is State.Ready) {
+                            _state.value = State.Failed("Colab 会话好像断开了，点重新启动")
+                        }
+                        Notifications.showSessionLost(context, "心跳失败，会话可能已被回收")
+                        stopKeepaliveService()
                     }
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
                     appendLog("保活失败：${describeError(e)}")
-                    if (_state.value is State.Ready) _state.value = State.Failed("Colab 会话好像断开了：${describeError(e)}")
+                    if (_state.value is State.Ready) {
+                        _state.value = State.Failed("Colab 会话好像断开了：${describeError(e)}")
+                    }
+                    Notifications.showSessionLost(context, "会话可能已被回收：${describeError(e)}")
+                    stopKeepaliveService()
                 }
             }
         }
+    }
+
+    /** 设置页切换后台保活 */
+    fun setBackgroundKeepaliveEnabled(enabled: Boolean) {
+        keepaliveEnabled = enabled
+        if (enabled) {
+            if (_state.value is State.Ready) startKeepalive()
+        } else {
+            keepaliveJob?.cancel()
+            keepaliveJob = null
+            stopKeepaliveService()
+        }
+    }
+
+    /**
+     * App 重启/界面重建后：如果本地还存着已配对的会话且 Google 仍登录，
+     * 直接恢复 Ready 状态并重新启动保活（网关连接由 ViewModel 检测）。
+     */
+    fun resumeIfSessionExists(): Boolean {
+        if (isBusy) return _state.value is State.Ready
+        if (_state.value is State.Ready) return true
+        if (!store.hasPair || store.endpoint.isBlank() || !auth.isLoggedIn()) return false
+        _state.value = State.Ready("T4", store.startedAtMs)
+        appendLog("恢复上次的 Colab 会话，已启动后台保活")
+        startKeepalive()
+        return true
+    }
+
+    private fun startKeepaliveService() {
+        if (keepaliveServiceStarted) return
+        runCatching {
+            ContextCompat.startForegroundService(context, Intent(context, KeepaliveService::class.java))
+            keepaliveServiceStarted = true
+        }.onFailure { appendLog("前台保活服务启动失败：${it.message}") }
+    }
+
+    private fun stopKeepaliveService() {
+        if (!keepaliveServiceStarted) return
+        runCatching { context.stopService(Intent(context, KeepaliveService::class.java)) }
+        keepaliveServiceStarted = false
     }
 
     // ---------------- 内部 ----------------

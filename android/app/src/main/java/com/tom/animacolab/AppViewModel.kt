@@ -15,6 +15,7 @@ import com.tom.animacolab.data.HistoryItem
 import com.tom.animacolab.data.ImageLoader
 import com.tom.animacolab.data.ImageRef
 import com.tom.animacolab.data.JobState
+import com.tom.animacolab.data.LocalImageStore
 import com.tom.animacolab.data.MediaSaver
 import com.tom.animacolab.data.ModelPreset
 import com.tom.animacolab.data.NegativePreset
@@ -28,8 +29,6 @@ import com.tom.animacolab.data.Tag
 import com.tom.animacolab.data.TagCategory
 import com.tom.animacolab.colab.ColabSessionManager
 import com.tom.animacolab.colab.ColabSessionStore
-import com.tom.animacolab.colab.GoogleAuth
-import com.tom.animacolab.colab.GoogleAuthStore
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -67,6 +66,8 @@ data class UiState(
     val deployLogs: List<String> = emptyList(),
     val googleLoggedIn: Boolean = false,
     val authUrlToOpen: String? = null,
+    val autoDownload: Boolean = true,
+    val backgroundKeepalive: Boolean = true,
 ) {
     val availableModels: List<Pair<ModelPreset, String>> get() = buildAvailable(info, presets)
     val currentPreset: ModelPreset? get() = presets.firstOrNull { it.id == form.modelId }
@@ -96,10 +97,11 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val assets = Assets(app)
     private val client = ComfyClient()
     private val loader = ImageLoader(client)
-    private val googleAuthStore = GoogleAuthStore(app)
-    private val googleAuth = GoogleAuth(googleAuthStore)
-    private val colabSessionStore = ColabSessionStore(app)
-    private val colabSession = ColabSessionManager(app, googleAuth, colabSessionStore, viewModelScope)
+    private val localImages = LocalImageStore(app)
+    private val animaApp = app as AnimaApplication
+    private val googleAuth = animaApp.auth
+    private val colabSessionStore = animaApp.colabSessionStore
+    private val colabSession = animaApp.sessionManager
 
     private val _state = MutableStateFlow(UiState())
     val state: StateFlow<UiState> = _state.asStateFlow()
@@ -122,6 +124,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 snippets = assets.snippets,
                 negativePresets = assets.negativePresets,
                 templates = assets.templates + store.userTemplates(),
+                autoDownload = store.autoDownload,
+                backgroundKeepalive = store.backgroundKeepalive,
                 connection = if (config.configured) ConnectionState.Checking else ConnectionState.NotConfigured,
             )
         }
@@ -190,6 +194,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                         form = if (presetChanged) applyPresetToForm(s.form, s.presets.firstOrNull { it.id == modelId }) else s.form,
                     )
                 }
+                if (colabSessionStore.hasPair && colabSessionStore.pairUrl == config.baseUrl) {
+                    colabSession.resumeIfSessionExists()
+                }
             } catch (e: ApiException) {
                 _state.update { it.copy(connection = ConnectionState.Error(e.userMessage)) }
             } catch (e: Exception) {
@@ -242,6 +249,17 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         store.sessionManaged = false
         _state.update { it.copy(config = Config(), connection = ConnectionState.NotConfigured, info = null) }
         message("已清除配对信息")
+    }
+
+    fun setAutoDownload(enabled: Boolean) {
+        store.autoDownload = enabled
+        _state.update { it.copy(autoDownload = enabled) }
+    }
+
+    fun setBackgroundKeepalive(enabled: Boolean) {
+        store.backgroundKeepalive = enabled
+        colabSession.setBackgroundKeepaliveEnabled(enabled)
+        _state.update { it.copy(backgroundKeepalive = enabled) }
     }
 
     // ---------------- 一键 Colab 会话 ----------------
@@ -497,9 +515,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 _state.update { it.copy(job = JobState.Queued(pid, jobStartedAt)) }
                 startTracking(pid)
             } catch (e: ApiException) {
-                _state.update { it.copy(job = JobState.Failed(e.userMessage)) }
+                failJob(e.userMessage)
             } catch (e: Exception) {
-                _state.update { it.copy(job = JobState.Failed(e.message ?: "提交失败")) }
+                failJob(e.message ?: "提交失败")
             }
         }
     }
@@ -537,13 +555,13 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 } catch (e: Exception) {
                     failures++
                     if (failures >= 6) {
-                        _state.update { it.copy(job = JobState.Failed("和 Colab 的连接断开了：${e.message ?: ""}")) }
+                        failJob("和 Colab 的连接断开了：${e.message ?: ""}")
                         break
                     }
                 }
             }
             if (!jobCompleted && jobPid == pid) {
-                _state.update { it.copy(job = JobState.Failed("生成超时（15 分钟），检查 Colab 会话是否还在跑")) }
+                failJob("生成超时（15 分钟），检查 Colab 会话是否还在跑")
             }
             closeSocket()
         }
@@ -597,7 +615,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             "execution_error" -> {
                 val d = obj.optJSONObject("data")
                 val text = d?.optString("exception_message").orEmpty().ifBlank { d?.optString("exception_type").orEmpty() }
-                _state.update { it.copy(job = JobState.Failed("执行出错：${text.ifBlank { "未知错误" }}")) }
+                failJob("执行出错：${text.ifBlank { "未知错误" }}")
                 jobCompleted = true
                 closeSocket()
             }
@@ -618,6 +636,37 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(job = JobState.Success(pid, item, elapsed)) }
         closeSocket()
         refreshHistory()
+        deliverResult(item)
+    }
+
+    /** 出图完成：按设置把图片自动下载到 App 私有存储 → 发系统通知（不自动进相册） */
+    private fun deliverResult(item: HistoryItem) {
+        val config = _state.value.config
+        val autoDownload = _state.value.autoDownload
+        viewModelScope.launch {
+            var downloaded = 0
+            if (config.configured && autoDownload) {
+                item.images.forEach { ref ->
+                    val local = LocalImageStore(getApplication()).exists(item.promptId, ref.filename)
+                    if (local) {
+                        downloaded++
+                        return@forEach
+                    }
+                    val bytes = runCatching {
+                        loader.bytes(ComfyClient.viewUrl(config.baseUrl, ref), config.token)
+                    }.getOrNull()
+                    if (bytes != null && localImages.write(item.promptId, ref.filename, bytes)) {
+                        downloaded++
+                    }
+                }
+            }
+            Notifications.showGenerationDone(getApplication(), item.images.size, downloaded)
+        }
+    }
+
+    private fun failJob(message: String, notify: Boolean = true) {
+        _state.update { it.copy(job = JobState.Failed(message)) }
+        if (notify) Notifications.showGenerationFailed(getApplication(), message)
     }
 
     private fun closeSocket() {
@@ -713,7 +762,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(savingImage = true) }
         viewModelScope.launch {
             try {
-                val bytes = client.imageBytes(config.baseUrl, config.token, target)
+                val bytes = localImages.read(item.promptId, target.filename)
+                    ?: client.imageBytes(config.baseUrl, config.token, target)
                 val uri = MediaSaver.savePng(getApplication(), bytes, target.filename)
                 if (uri != null) message("已保存到相册（Pictures/AnimaColab）") else message("保存失败")
             } catch (e: Exception) {
@@ -730,7 +780,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(savingImage = true) }
         viewModelScope.launch {
             try {
-                val bytes = client.imageBytes(config.baseUrl, config.token, target)
+                val bytes = localImages.read(item.promptId, target.filename)
+                    ?: client.imageBytes(config.baseUrl, config.token, target)
                 val uri = MediaSaver.savePng(getApplication(), bytes, target.filename)
                 if (uri != null) {
                     MediaSaver.share(getApplication(), uri)

@@ -47,6 +47,19 @@ colab/
 正则解析 `PAIR: <url>|<token>` → 写入配对 → `connect()`。
 停止会话：删 kernel + `unassign(endpoint)` + 清空本地会话；若是自动写入的配对会一并清除（手动配对不受影响）。
 
+## 后台保活 / 通知 / 自动下载
+
+- **前台服务保活**：会话 Ready 后启动 `KeepaliveService`（`foregroundServiceType=specialUse`），
+  常驻通知「Anima Colab 会话运行中 / T4 保活中」，并带「打开 App」「停止会话」两个动作。
+  心跳（每 4 分钟一次 kernel 执行）跑在 Application 级协程里，所以切后台/关屏不会断。
+  设置页可关（「通知与保存 → 后台保活」）。
+- **生成完自动下载**：出图后自动把 PNG 拉到 App 私有存储 `files/images/`（不写系统相册），
+  通知文案明确「点保存才会进相册」。`保存` 按钮才写 MediaStore（`Pictures/AnimaColab`）；
+  `分享` 也优先复用本地字节，不再重复走隧道下载。
+- **系统通知**：`Notifications` 统一管理两个渠道（`colab_session` 低优先级常驻；`generation` 普通优先级），
+  事件包括：Colab T4 已就绪 / 出图完成（含自动下载数量）/ 生成失败 / 会话断开。
+  Android 13+ 启动时申请 `POST_NOTIFICATIONS`。
+
 ## 生成流程
 
 1. `GenerateScreen` 表单 → `AppViewModel.generate()`

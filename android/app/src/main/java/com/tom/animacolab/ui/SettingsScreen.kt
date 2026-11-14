@@ -24,6 +24,7 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -77,6 +78,29 @@ fun SettingsScreen(vm: AppViewModel, state: UiState) {
         Spacer(Modifier.height(10.dp))
 
         ColabSessionCard(vm, state, context)
+
+        Spacer(Modifier.height(10.dp))
+        SectionCard(title = "通知与保存") {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("生成后自动下载图片", style = MaterialTheme.typography.bodyMedium, color = TextPrimary)
+                    Text("只存到 App 本地，不写入系统相册；点「保存」才进相册", style = MaterialTheme.typography.labelSmall, color = TextSecondary)
+                }
+                Switch(checked = state.autoDownload, onCheckedChange = vm::setAutoDownload)
+            }
+            Spacer(Modifier.height(6.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("后台保活（常驻通知）", style = MaterialTheme.typography.bodyMedium, color = TextPrimary)
+                    Text(
+                        "关屏/切后台保持 Colab 会话，每 4 分钟一次心跳",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = TextSecondary,
+                    )
+                }
+                Switch(checked = state.backgroundKeepalive, onCheckedChange = vm::setBackgroundKeepalive)
+            }
+        }
 
         Spacer(Modifier.height(10.dp))
         SectionCard(title = "手动配对（备用）", subtitle = if (showAdvanced) null else "点右侧展开") {

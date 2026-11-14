@@ -297,35 +297,73 @@ def runtime_base(proxy_info):
     return proxy_info["url"].rstrip("/")
 
 
-def create_kernel(http, proxy_info, timeout=180):
+def create_kernel(http, proxy_info, timeout=180, retries=3, backoff=10.0):
     body = {"name": "python3", "path": None}
-    response = http.request(
-        "POST", runtime_base(proxy_info) + "/api/kernels",
-        headers=runtime_headers(proxy_info), json_body=body, timeout=timeout,
-    )
-    if response.status_code not in (200, 201):
-        raise RuntimeError(
-            "create kernel failed: HTTP %s %s"
-            % (response.status_code, response.text[:800])
-        )
-    return response.json()
-
-
-def wait_kernel_ready(http, proxy_info, kernel_id, timeout=180):
-    deadline = time.time() + timeout
-    url = runtime_base(proxy_info) + "/api/kernels/" + kernel_id
-    while time.time() < deadline:
+    url = runtime_base(proxy_info) + "/api/kernels"
+    last_error = None
+    for attempt in range(retries + 1):
+        started = time.time()
         try:
-            response = http.request("GET", url, headers=runtime_headers(proxy_info),
-                                    timeout=30)
-            if response.status_code == 200:
-                state = (response.json() or {}).get("execution_state")
-                if state in ("idle", "busy", None):
-                    return True
-        except (requests.ConnectionError, requests.Timeout):
-            pass
-        time.sleep(2)
-    return False
+            response = http.request("POST", url, headers=runtime_headers(proxy_info),
+                                    json_body=body, timeout=timeout)
+            if response.status_code in (200, 201):
+                return response.json()
+            last_error = RuntimeError("create kernel failed: HTTP %s %s"
+                                      % (response.status_code, response.text[:800]))
+            if response.status_code not in (502, 503, 504):
+                raise last_error
+        except (requests.ConnectionError, requests.Timeout) as exc:
+            last_error = exc
+        if attempt < retries:
+            delay = backoff * (2 ** attempt)
+            log("kernel create retry %d/%d in %.0fs (last: %.1fs, %r)"
+                % (attempt + 1, retries, delay, time.time() - started, last_error))
+            time.sleep(delay)
+    raise last_error
+
+
+def check_kernel_listed(http, proxy_info, kernel_id, timeout=15):
+    """Best-effort status lookup via /api/kernels (the single-kernel GET can hang).
+
+    A fresh VM reports the kernel as "starting"; the channels websocket queues
+    execute_request until it is ready, so we never block on this check.
+    """
+    try:
+        response = http.request("GET", runtime_base(proxy_info) + "/api/kernels",
+                                headers=runtime_headers(proxy_info), timeout=timeout)
+        if response.status_code == 200:
+            for kernel in response.json() or []:
+                if kernel.get("id") == kernel_id:
+                    return kernel.get("execution_state")
+    except (requests.ConnectionError, requests.Timeout) as exc:
+        log("kernel list check skipped: %r" % (exc,))
+    return None
+
+
+def delete_kernel(http, proxy_info, kernel_id, timeout=20):
+    try:
+        response = http.request(
+            "DELETE", runtime_base(proxy_info) + "/api/kernels/" + kernel_id,
+            headers=runtime_headers(proxy_info), timeout=timeout)
+        return response.status_code in (200, 204)
+    except (requests.ConnectionError, requests.Timeout):
+        return False
+
+
+def cleanup_stale_kernels(http, proxy_info, state_file, keep_kernel_id):
+    """Delete kernels left over from previous bootstrap runs (kernel residue)."""
+    state_file = Path(state_file)
+    try:
+        stale = json.loads(state_file.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        stale = []
+    for kernel_id in stale:
+        if kernel_id == keep_kernel_id:
+            continue
+        if delete_kernel(http, proxy_info, kernel_id):
+            log("deleted stale kernel %s" % kernel_id)
+    state_file.parent.mkdir(parents=True, exist_ok=True)
+    state_file.write_text(json.dumps([keep_kernel_id]), encoding="utf-8")
 
 
 def shutdown_kernel(http, proxy_info, kernel_id):
@@ -484,6 +522,9 @@ def main(argv=None):
                         help="DELETE the kernel after execution (deploy keeps running)")
     parser.add_argument("--reuse-kernel", default=None,
                         help="reuse this kernel id instead of creating a new one")
+    parser.add_argument("--kernel-state", default=os.path.expanduser(
+                            "~/.cache/anima_bootstrap_kernels.json"),
+                        help="records bootstrap kernel ids to clean up on the next run")
     args = parser.parse_args(argv)
 
     if websockets is None:
@@ -543,9 +584,12 @@ def main(argv=None):
     kernel_id = kernel.get("id")
     if not kernel_id:
         raise RuntimeError("create kernel returned no id: %r" % (kernel,))
-    if not wait_kernel_ready(http, proxy_info, kernel_id, timeout=args.max_assign_wait):
-        raise RuntimeError("kernel %s did not become ready" % kernel_id)
-    log("kernel ready: %s" % kernel_id)
+    cleanup_stale_kernels(http, proxy_info, args.kernel_state, kernel_id)
+    state = check_kernel_listed(http, proxy_info, kernel_id)
+    log("kernel listed, execution_state=%r (channels buffered until ready)" % (state,))
+    # NOTE: do not block on the single-kernel GET endpoint: on Colab's runtime
+    # proxy it can take >30s; the channels websocket queues execute_request
+    # until the kernel is ready.
 
     # -- 4. code to execute -------------------------------------------------
     if args.exec_code is not None:
