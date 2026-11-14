@@ -7,7 +7,7 @@
         "anima-base-v1.0",
         "anima-base"
       ],
-      "display": "Anima Base v1.0",
+      "display": "Base v1.0",
       "desc": "未精修底座，30-50 步 / CFG 4-5，必须加质量标签，画风上限最高",
       "steps": 30,
       "cfg": 4.5,
@@ -37,7 +37,7 @@
         "anima-aesthetic-v1.1",
         "anima-aesthetic"
       ],
-      "display": "Anima Aesthetic v1.1",
+      "display": "Aesthetic v1.1",
       "desc": "高质量微调，20-30 步 / CFG 4-4.5，默认出图最好看；不要加质量标签、负向不用 score_*",
       "steps": 30,
       "cfg": 4.5,
@@ -66,7 +66,7 @@
         "anima-turbo-v1.1",
         "anima-turbo"
       ],
-      "display": "Anima Turbo v1.1",
+      "display": "Turbo v1.1",
       "desc": "步数蒸馏版，12 步 / CFG 1.0，速度最快；CFG 1 下负向提示词无效",
       "steps": 12,
       "cfg": 1.0,

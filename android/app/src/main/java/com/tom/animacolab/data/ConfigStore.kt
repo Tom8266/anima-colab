@@ -28,6 +28,16 @@ class ConfigStore(context: Context) {
         get() = sp.getBoolean("background_keepalive", true)
         set(v) = sp.edit().putBoolean("background_keepalive", v).apply()
 
+    /** 外观：深浅色模式 */
+    var themeMode: ThemeMode
+        get() = ThemeMode.fromId(sp.getString("theme_mode", null))
+        set(v) = sp.edit().putString("theme_mode", v.id).apply()
+
+    /** 外观：Android 12+ 动态取色（Material You）；默认使用品牌 expressive 色板 */
+    var dynamicColor: Boolean
+        get() = sp.getBoolean("dynamic_color", false)
+        set(v) = sp.edit().putBoolean("dynamic_color", v).apply()
+
     /** 当前配对是否由「一键启动 Colab」自动写入（停止会话时可安全清除） */
     var sessionManaged: Boolean
         get() = sp.getBoolean("session_managed", false)

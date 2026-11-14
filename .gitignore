@@ -3,6 +3,7 @@ android/.gradle/
 android/build/
 android/app/build/
 android/local.properties
+android/.kotlin/
 *.apk
 *.aab
 # Python
@@ -12,3 +13,7 @@ __pycache__/
 outputs/
 *.log
 colab/.ipynb_checkpoints/
+
+# 本地构建/截图工作区（不提交）
+.gradle-user-home/
+.tmp/

@@ -1,36 +1,55 @@
 package com.tom.animacolab.ui
 
-import androidx.compose.foundation.clickable
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.BookmarkBorder
+import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Remove
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.FilterChip
+import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.PrimaryScrollableTabRow
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.ToggleButton
+import androidx.compose.material3.ToggleButtonDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -39,251 +58,758 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tom.animacolab.AppViewModel
 import com.tom.animacolab.UiState
+import com.tom.animacolab.data.ModelPreset
 import com.tom.animacolab.data.PromptTemplate
+import com.tom.animacolab.data.Snippet
 import com.tom.animacolab.data.Tag
 import com.tom.animacolab.data.TagCategory
-import com.tom.animacolab.ui.theme.Bg
-import com.tom.animacolab.ui.theme.Primary
-import com.tom.animacolab.ui.theme.Secondary
-import com.tom.animacolab.ui.theme.SurfaceHigh
-import com.tom.animacolab.ui.theme.TextPrimary
-import com.tom.animacolab.ui.theme.TextSecondary
+import com.tom.animacolab.ui.theme.AnimaShape
+import com.tom.animacolab.ui.theme.Spacing
+import java.util.Locale
+
+// ===========================================================================
+// 速查页：Tag 速查 + 提示词模板 双模式
+//
+// 功能全景（重写前的能力全部保留）：
+//  - Tag 模式：中/英文搜索、分类筛选（全部 + 各分类横向滚动）、插入位置（正向/负向）、
+//    常用片段点击插入、Tag 列表（中文名 + 英文 + 分类 + 画师标记，整行可点 + 右侧添加按钮）。
+//  - 模板模式：搜索、模板卡（名称/note/prompt 预览/参数 meta）、应用、用户模板删除、空态。
+//  - 模式切换用 SegmentedOptions；内容切换用 AnimatedContent 做轻微淡入缩放。
+// ===========================================================================
 
 @Composable
 fun ExploreScreen(vm: AppViewModel, state: UiState, onBack: () -> Unit) {
     var mode by rememberSaveable { mutableIntStateOf(0) }
-    Column(Modifier.fillMaxSize()) {
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text("提示词速查", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = TextPrimary, modifier = Modifier.weight(1f))
-        }
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            FilterChip(
-                selected = mode == 0,
-                onClick = { mode = 0 },
-                label = { Text("Tag 速查") },
-                shape = RoundedCornerShape(10.dp),
-            )
-            FilterChip(
-                selected = mode == 1,
-                onClick = { mode = 1 },
-                label = { Text("模板") },
-                shape = RoundedCornerShape(10.dp),
-            )
-        }
-        Spacer(Modifier.height(6.dp))
-        if (mode == 0) TagsContent(vm, state) else TemplatesContent(vm, state)
-    }
-}
-
-@Composable
-private fun TagsContent(vm: AppViewModel, state: UiState) {
-    var query by rememberSaveable { mutableStateOf("") }
+    // 状态提升到屏幕级：模式来回切换时，搜索词 / 分类 / 插入位置都不丢失。
+    var tagQuery by rememberSaveable { mutableStateOf("") }
     var categoryId by rememberSaveable { mutableStateOf("all") }
     var positive by rememberSaveable { mutableStateOf(true) }
-    val categories = state.tagCategories
+    var templateQuery by rememberSaveable { mutableStateOf("") }
 
+    val tagCount = remember(state.tagCategories) { state.tagCategories.sumOf { it.tags.size } }
+    val templateCount = state.templates.size
+
+    // 模式切换动效走主题 motionScheme（spatial 用于缩放、effects 用于透明度）。
+    val motion = MaterialTheme.motionScheme
+    val fadeSpec = motion.defaultEffectsSpec<Float>()
+    val scaleSpec = motion.defaultSpatialSpec<Float>()
+
+    Column(
+        Modifier
+            .fillMaxSize()
+            .imePadding(),
+    ) {
+        ScreenHeader(
+            title = "速查",
+            subtitle = "$tagCount 个 Tag · $templateCount 套模板",
+        )
+
+        SegmentedOptions(
+            options = listOf("Tag 速查", "模板"),
+            selectedIndex = mode,
+            onSelect = { mode = it },
+            modifier = Modifier.padding(horizontal = Spacing.screen),
+        )
+        Spacer(Modifier.height(Spacing.sm))
+
+        AnimatedContent(
+            targetState = mode,
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f),
+            contentAlignment = Alignment.TopCenter,
+            transitionSpec = {
+                (fadeIn(animationSpec = fadeSpec) + scaleIn(animationSpec = scaleSpec, initialScale = 0.98f))
+                    .togetherWith(
+                        fadeOut(animationSpec = fadeSpec) + scaleOut(animationSpec = scaleSpec, targetScale = 0.99f),
+                    )
+            },
+            label = "exploreModeTransition",
+        ) { current ->
+            if (current == 0) {
+                TagsContent(
+                    vm = vm,
+                    state = state,
+                    query = tagQuery,
+                    onQueryChange = { tagQuery = it },
+                    categoryId = categoryId,
+                    onCategoryChange = { categoryId = it },
+                    positive = positive,
+                    onPositiveChange = { positive = it },
+                )
+            } else {
+                TemplatesContent(
+                    vm = vm,
+                    state = state,
+                    query = templateQuery,
+                    onQueryChange = { templateQuery = it },
+                    onGoGenerate = onBack,
+                )
+            }
+        }
+    }
+}
+
+// ===========================================================================
+// Tag 模式
+// ===========================================================================
+
+@Composable
+private fun TagsContent(
+    vm: AppViewModel,
+    state: UiState,
+    query: String,
+    onQueryChange: (String) -> Unit,
+    categoryId: String,
+    onCategoryChange: (String) -> Unit,
+    positive: Boolean,
+    onPositiveChange: (Boolean) -> Unit,
+) {
+    val categories = state.tagCategories
+    // 选中分类在「全部(0) + categories」里的下标；分类数据变化或 id 失效时回退到「全部」。
+    val selectedCategoryIndex = remember(categories, categoryId) {
+        if (categoryId == "all") {
+            0
+        } else {
+            categories.indexOfFirst { it.id == categoryId }.let { if (it < 0) 0 else it + 1 }
+        }
+    }
+    // 过滤结果：只在搜索词 / 分类变化时重算，288+ Tag 不会在每次重组时重复遍历。
     val filtered: List<Pair<TagCategory, Tag>> = remember(categories, categoryId, query) {
-        val base = if (categoryId == "all") categories else categories.filter { it.id == categoryId }
-        val q = query.trim().lowercase()
-        base.flatMap { cat ->
-            cat.tags.filter { t ->
-                q.isBlank() || t.en.lowercase().contains(q) || t.zh.contains(query.trim(), ignoreCase = true)
-            }.map { cat to it }
+        val base = if (selectedCategoryIndex == 0) {
+            categories
+        } else {
+            listOfNotNull(categories.getOrNull(selectedCategoryIndex - 1))
+        }
+        val q = query.trim()
+        if (q.isBlank()) {
+            base.flatMap { cat -> cat.tags.map { cat to it } }
+        } else {
+            base.flatMap { cat ->
+                cat.tags
+                    .filter { it.en.contains(q, ignoreCase = true) || it.zh.contains(q, ignoreCase = true) }
+                    .map { cat to it }
+            }
+        }
+    }
+
+    val listState = rememberLazyListState()
+    // 换关键词 / 换分类后回到结果顶部（只在确实滚动过时调用，空列表下不做无意义滚动）。
+    LaunchedEffect(categoryId, query) {
+        if (listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > 0) {
+            listState.scrollToItem(0)
         }
     }
 
     Column(Modifier.fillMaxSize()) {
+        // 搜索 + 插入位置同一行：把首屏留给 Tag 列表。
         Row(
-            Modifier
+            modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 6.dp),
+                .padding(horizontal = Spacing.screen),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("插入位置", style = MaterialTheme.typography.labelMedium, color = TextSecondary)
-            Spacer(Modifier.width(8.dp))
-            FilterChip(selected = positive, onClick = { positive = true }, label = { Text("正向") })
-            FilterChip(selected = !positive, onClick = { positive = false }, label = { Text("负向") })
-        }
-        OutlinedTextField(
-            value = query,
-            onValueChange = { query = it },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp),
-            label = { Text("搜索 tag（中/英文）") },
-            singleLine = true,
-            shape = RoundedCornerShape(12.dp),
-        )
-        LazyRow(
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            item {
-                FilterChip(
-                    selected = categoryId == "all",
-                    onClick = { categoryId = "all" },
-                    label = { Text("全部", fontSize = 12.sp) },
-                    shape = RoundedCornerShape(10.dp),
-                )
-            }
-            items(categories) { cat ->
-                FilterChip(
-                    selected = categoryId == cat.id,
-                    onClick = { categoryId = cat.id },
-                    label = { Text(cat.zh, fontSize = 12.sp) },
-                    shape = RoundedCornerShape(10.dp),
-                )
-            }
-        }
-
-        LazyColumn(modifier = Modifier.fillMaxSize()) {
-            if (state.snippets.isNotEmpty()) {
-                item {
-                    Column(Modifier.padding(horizontal = 16.dp)) {
-                        SectionHeader("常用片段")
-                        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            state.snippets.forEach { snippet ->
-                                AssistChip(
-                                    onClick = { vm.appendSnippet(snippet.text, positive) },
-                                    label = { Text(snippet.name, fontSize = 11.sp) },
-                                )
-                            }
+            AnimaTextField(
+                value = query,
+                onValueChange = onQueryChange,
+                modifier = Modifier.weight(1f),
+                label = "搜索 Tag（中/英文）",
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                leadingIcon = Icons.Outlined.Search,
+                trailingIcon = if (query.isNotEmpty()) {
+                    {
+                        IconButton(onClick = { onQueryChange("") }) {
+                            Icon(
+                                Icons.Outlined.Close,
+                                contentDescription = "清除搜索",
+                                modifier = Modifier.size(20.dp),
+                            )
                         }
                     }
-                }
-            }
-            items(filtered.take(400)) { (cat, tag) ->
-                TagRow(cat, tag) { vm.appendTag(tag.en, positive) }
-            }
-            item { Spacer(Modifier.height(20.dp)) }
+                } else {
+                    null
+                },
+            )
+            Spacer(Modifier.width(Spacing.sm))
+            InsertTargetToggle(
+                positive = positive,
+                onPositiveChange = onPositiveChange,
+            )
         }
-    }
-}
+        Spacer(Modifier.height(Spacing.xs))
 
-@Composable
-private fun TagRow(category: TagCategory, tag: Tag, onAdd: () -> Unit) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onAdd)
-            .padding(horizontal = 16.dp, vertical = 9.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    tag.zh,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = TextPrimary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                if (tag.artist) {
-                    Spacer(Modifier.width(6.dp))
-                    Text("画师", style = MaterialTheme.typography.labelSmall, color = Secondary, fontSize = 9.sp)
-                }
-            }
-            MetaText(tag.en)
-        }
-        Text(category.zh, style = MaterialTheme.typography.labelSmall, color = TextSecondary, fontSize = 10.sp)
-        IconButton(onClick = onAdd) {
-            Icon(Icons.Filled.Add, contentDescription = "插入", tint = Primary, modifier = Modifier.size(18.dp))
-        }
-    }
-}
+        CategoryTabRow(
+            categories = categories,
+            selectedIndex = selectedCategoryIndex,
+            resultCount = filtered.size,
+            onSelect = { onCategoryChange(it) },
+        )
 
-@Composable
-private fun TemplatesContent(vm: AppViewModel, state: UiState) {
-    var query by rememberSaveable { mutableStateOf("") }
-    val templates = state.templates.filter {
-        query.isBlank() || it.name.contains(query, true) || it.prompt.contains(query, true) || (it.note ?: "").contains(query, true)
-    }
-    Column(Modifier.fillMaxSize()) {
-        OutlinedTextField(
-            value = query,
-            onValueChange = { query = it },
+        LazyColumn(
+            state = listState,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 6.dp),
-            label = { Text("搜索模板") },
-            singleLine = true,
-            shape = RoundedCornerShape(12.dp),
-        )
-        if (templates.isEmpty()) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("没有模板", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
-            }
-        } else {
-            LazyColumn(modifier = Modifier.fillMaxSize()) {
-                items(templates, key = { it.id }) { template ->
-                    TemplateCard(vm, template)
+                .weight(1f),
+            contentPadding = PaddingValues(top = Spacing.xs, bottom = Spacing.xxl),
+            verticalArrangement = Arrangement.spacedBy(Spacing.sm),
+        ) {
+            if (state.snippets.isNotEmpty()) {
+                item(key = "snippets") {
+                    SnippetsRow(
+                        snippets = state.snippets,
+                        onSnippet = { snippet ->
+                            if (snippet.text.isBlank()) {
+                                // 「留空」类片段是提示信息：点击给出一次解释，不静默无响应。
+                                vm.message("「${snippet.name}」是提示片段：保持留空即可")
+                            } else {
+                                vm.appendSnippet(snippet.text, positive)
+                            }
+                        },
+                    )
                 }
-                item { Spacer(Modifier.height(20.dp)) }
+            }
+
+            if (filtered.isEmpty()) {
+                item(key = "tagEmpty") {
+                    val clearSearch: () -> Unit = { onQueryChange("") }
+                    EmptyState(
+                        title = "没有匹配的 Tag",
+                        description = when {
+                            categories.isEmpty() -> "Tag 数据还没准备好，稍后再试"
+                            query.isNotBlank() -> "换个关键词，或点下面的按钮清除搜索"
+                            else -> "这个分类下暂时没有 Tag，换个分类看看"
+                        },
+                        icon = Icons.Outlined.Search,
+                        actionLabel = if (query.isNotBlank()) "清除搜索" else null,
+                        onAction = if (query.isNotBlank()) clearSearch else null,
+                    )
+                }
+            } else {
+                items(filtered.take(400), key = { it.second.en }) { (category, tag) ->
+                    TagRow(
+                        category = category,
+                        tag = tag,
+                        modifier = Modifier.animateItem(),
+                        onAdd = { vm.appendTag(tag.en, positive) },
+                    )
+                }
             }
         }
     }
 }
 
+/**
+ * 插入位置（紧凑单键）：点一下在「正向 / 负向」间切换。
+ *
+ * 选中 = primary 实心 + check 图标；未选中 = surfaceContainerHigh 容器 + 1dp outlineVariant 描边，
+ * 保证在深浅色下都不会与背景融为一体（不靠颜色单独传达状态：图标 + 形状 morph 同时变化）。
+ */
 @Composable
-private fun TemplateCard(vm: AppViewModel, template: PromptTemplate) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 5.dp)
-            .clickable { vm.applyTemplate(template) },
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = SurfaceHigh),
+private fun InsertTargetToggle(
+    positive: Boolean,
+    onPositiveChange: (Boolean) -> Unit,
+) {
+    ToggleButton(
+        checked = positive,
+        onCheckedChange = onPositiveChange,
+        colors = ToggleButtonDefaults.colors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            checkedContainerColor = MaterialTheme.colorScheme.primary,
+            checkedContentColor = MaterialTheme.colorScheme.onPrimary,
+        ),
+        border = if (positive) {
+            null
+        } else {
+            BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        },
+        icon = {
+            Icon(
+                if (positive) Icons.Filled.Check else Icons.Outlined.Remove,
+                contentDescription = null,
+                modifier = Modifier.size(ToggleButtonDefaults.IconSize),
+            )
+        },
     ) {
-        Column(Modifier.padding(12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(template.name, style = MaterialTheme.typography.titleSmall, color = TextPrimary, modifier = Modifier.weight(1f))
-                if (template.user) {
-                    Text("我的", style = MaterialTheme.typography.labelSmall, color = Secondary, fontSize = 10.sp)
-                    IconButton(onClick = { vm.deleteTemplate(template.id) }) {
-                        Icon(Icons.Filled.Delete, contentDescription = "删除", tint = TextSecondary, modifier = Modifier.size(18.dp))
-                    }
+        Text(
+            if (positive) "正向" else "负向",
+            letterSpacing = 0.sp,
+            maxLines = 1,
+        )
+    }
+}
+
+/** 分类筛选：PrimaryScrollableTabRow（走主题，edgePadding 20dp），右侧显示当前筛选结果数。 */
+@Composable
+private fun CategoryTabRow(
+    categories: List<TagCategory>,
+    selectedIndex: Int,
+    resultCount: Int,
+    onSelect: (String) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        val background = MaterialTheme.colorScheme.background
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .drawWithContent {
+                    drawContent()
+                    // 右边缘渐隐到页面背景：提示分类行可横向滚动，避免文字被硬裁切（视觉 QA P2-5）。
+                    // 宽度 = 行尾 edgePadding，滚到最后一个分类时不会压暗文字。
+                    val fade = 20.dp.toPx()
+                    drawRect(
+                        brush = Brush.horizontalGradient(
+                            colors = listOf(Color.Transparent, background),
+                            startX = size.width - fade,
+                            endX = size.width,
+                        ),
+                        topLeft = Offset(size.width - fade, 0f),
+                        size = Size(fade, size.height),
+                    )
+                },
+        ) {
+            PrimaryScrollableTabRow(
+                selectedTabIndex = selectedIndex,
+                modifier = Modifier.fillMaxWidth(),
+                containerColor = Color.Transparent,
+                contentColor = MaterialTheme.colorScheme.primary,
+                edgePadding = Spacing.screen,
+                divider = {},
+            ) {
+                CategoryTab(label = "全部", selected = selectedIndex == 0, onClick = { onSelect("all") })
+                categories.forEachIndexed { index, category ->
+                    CategoryTab(
+                        label = category.zh,
+                        selected = selectedIndex == index + 1,
+                        onClick = { onSelect(category.id) },
+                    )
                 }
             }
-            if (!template.note.isNullOrBlank()) {
-                Text(template.note, style = MaterialTheme.typography.labelSmall, color = TextSecondary)
+        }
+        Surface(
+            modifier = Modifier.padding(start = Spacing.xs, end = Spacing.screen),
+            shape = AnimaShape.pill,
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        ) {
+            Text(
+                "$resultCount 个",
+                style = MaterialTheme.typography.labelSmall,
+                letterSpacing = 0.sp,
+                modifier = Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.xxs),
+            )
+        }
+    }
+}
+
+@Composable
+private fun CategoryTab(label: String, selected: Boolean, onClick: () -> Unit) {
+    Tab(
+        selected = selected,
+        onClick = onClick,
+        selectedContentColor = MaterialTheme.colorScheme.primary,
+        unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+        text = {
+            Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis, letterSpacing = 0.sp)
+        },
+    )
+}
+
+/** 常用片段：单行横向滚动的 AssistChip（12 个中文名过长，竖排换行会吃掉半屏）。 */
+@Composable
+private fun SnippetsRow(snippets: List<Snippet>, onSnippet: (Snippet) -> Unit) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .padding(top = Spacing.xs, bottom = Spacing.sm),
+    ) {
+        SectionLabel(
+            text = "常用片段",
+            modifier = Modifier.padding(horizontal = Spacing.screen),
+            trailing = {
+                Text(
+                    "${snippets.size} 个",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    letterSpacing = 0.sp,
+                )
+            },
+        )
+        LazyRow(
+            contentPadding = PaddingValues(horizontal = Spacing.screen),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+        ) {
+            items(snippets, key = { it.id }) { snippet ->
+                AssistChip(
+                    onClick = { onSnippet(snippet) },
+                    label = {
+                        Text(
+                            snippet.name,
+                            style = MaterialTheme.typography.labelLarge,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            letterSpacing = 0.sp,
+                        )
+                    },
+                    shape = AnimaShape.pill,
+                    colors = AssistChipDefaults.assistChipColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                        labelColor = MaterialTheme.colorScheme.onSurface,
+                    ),
+                    border = null,
+                )
             }
-            Spacer(Modifier.height(6.dp))
+        }
+    }
+}
+
+/** Tag 列表行：整行可点（按压回弹）+ 右侧添加按钮，两种方式都能插入提示词。 */
+@Composable
+private fun TagRow(
+    category: TagCategory,
+    tag: Tag,
+    modifier: Modifier = Modifier,
+    onAdd: () -> Unit,
+) {
+    val interaction = remember { MutableInteractionSource() }
+    Surface(
+        onClick = onAdd,
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = Spacing.screen)
+            .pressScale(interaction)
+            .semantics { role = Role.Button },
+        shape = AnimaShape.cardSmall,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        interactionSource = interaction,
+    ) {
+        Row(
+            modifier = Modifier.padding(start = Spacing.lg, end = Spacing.xxs, top = Spacing.xs, bottom = Spacing.xs),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        tag.zh,
+                        style = MaterialTheme.typography.bodyMediumEmphasized,
+                        letterSpacing = 0.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                    if (tag.artist) {
+                        Spacer(Modifier.width(Spacing.xs))
+                        ArtistBadge()
+                    }
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        tag.en,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Spacer(Modifier.width(Spacing.sm))
+                    Text(
+                        category.zh,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        letterSpacing = 0.sp,
+                    )
+                }
+            }
+            Spacer(Modifier.width(Spacing.xxs))
+            IconButton(onClick = onAdd) {
+                Icon(
+                    Icons.Outlined.Add,
+                    contentDescription = "插入 ${tag.zh}",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+        }
+    }
+}
+
+/** 画师标记：secondary 色系小胶囊，保持与旧版「画师」文案一致。 */
+@Composable
+private fun ArtistBadge() {
+    Surface(
+        shape = AnimaShape.pill,
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+    ) {
+        Text(
+            "画师",
+            style = MaterialTheme.typography.labelSmall,
+            letterSpacing = 0.sp,
+            modifier = Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.xxs),
+        )
+    }
+}
+
+// ===========================================================================
+// 模板模式
+// ===========================================================================
+
+@Composable
+private fun TemplatesContent(
+    vm: AppViewModel,
+    state: UiState,
+    query: String,
+    onQueryChange: (String) -> Unit,
+    onGoGenerate: () -> Unit,
+) {
+    // P2.5：删除用户模板前二次确认。
+    var pendingDelete by remember { mutableStateOf<PromptTemplate?>(null) }
+    val templates = remember(state.templates, query) {
+        val q = query.trim()
+        if (q.isBlank()) {
+            state.templates
+        } else {
+            state.templates.filter { template ->
+                template.name.contains(q, ignoreCase = true) ||
+                    template.prompt.contains(q, ignoreCase = true) ||
+                    (template.note ?: "").contains(q, ignoreCase = true)
+            }
+        }
+    }
+
+    Column(Modifier.fillMaxSize()) {
+        AnimaTextField(
+            value = query,
+            onValueChange = onQueryChange,
+            modifier = Modifier.padding(horizontal = Spacing.screen),
+            label = "搜索模板",
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+            leadingIcon = Icons.Outlined.Search,
+            trailingIcon = if (query.isNotEmpty()) {
+                {
+                    IconButton(onClick = { onQueryChange("") }) {
+                        Icon(
+                            Icons.Outlined.Close,
+                            contentDescription = "清除搜索",
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+                }
+            } else {
+                null
+            },
+        )
+
+        if (templates.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (state.templates.isEmpty()) {
+                    EmptyState(
+                        title = "没有模板",
+                        description = "在生成页把提示词存为模板，之后就能在这里一键套用",
+                        icon = Icons.Outlined.BookmarkBorder,
+                        actionLabel = "去生成",
+                        onAction = onGoGenerate,
+                    )
+                } else {
+                    EmptyState(
+                        title = "没有模板",
+                        description = "没有匹配「$query」的模板，换个关键词试试",
+                        icon = Icons.Outlined.Search,
+                        actionLabel = "清除搜索",
+                        onAction = { onQueryChange("") },
+                    )
+                }
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                contentPadding = PaddingValues(top = Spacing.sm, bottom = Spacing.xxl),
+                verticalArrangement = Arrangement.spacedBy(Spacing.md),
+            ) {
+                items(templates, key = { it.id }) { template ->
+                    TemplateCard(
+                        state = state,
+                        template = template,
+                        onApply = { vm.applyTemplate(template) },
+                        onDelete = { pendingDelete = template },
+                    )
+                }
+            }
+        }
+    }
+
+    val deleteTarget = pendingDelete
+    if (deleteTarget != null) {
+        AlertDialog(
+            onDismissRequest = { pendingDelete = null },
+            title = { Text("删除模板？") },
+            text = {
+                Text("将删除用户模板「${deleteTarget.name}」，删除后不可恢复。")
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        vm.deleteTemplate(deleteTarget.id)
+                        pendingDelete = null
+                    },
+                ) {
+                    Text("删除", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDelete = null }) { Text("取消") }
+            },
+        )
+    }
+}
+
+/** 模板卡：名称 + 应用/删除（标题行）/ note / prompt 预览（3 行截断）/ 参数 meta（独占一行）。 */
+@Composable
+private fun TemplateCard(
+    state: UiState,
+    template: PromptTemplate,
+    onApply: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    ExpressiveCard(
+        onClick = onApply,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = Spacing.screen),
+        shape = AnimaShape.card,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        contentPadding = PaddingValues(Spacing.card),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                template.name,
+                style = MaterialTheme.typography.titleMediumEmphasized,
+                color = MaterialTheme.colorScheme.onSurface,
+                letterSpacing = 0.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f),
+            )
+            if (template.user) {
+                Spacer(Modifier.width(Spacing.sm))
+                MyTemplateBadge()
+            }
+            Spacer(Modifier.width(Spacing.xxs))
+            IconButton(onClick = onApply) {
+                Icon(
+                    Icons.Outlined.AutoAwesome,
+                    contentDescription = "应用模板「${template.name}」",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+            if (template.user) {
+                IconButton(onClick = onDelete) {
+                    Icon(
+                        Icons.Outlined.Delete,
+                        contentDescription = "删除模板「${template.name}」",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+            }
+        }
+
+        if (!template.note.isNullOrBlank()) {
+            Spacer(Modifier.height(Spacing.xs))
+            Text(
+                template.note,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+
+        Spacer(Modifier.height(Spacing.md))
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = AnimaShape.cardSmall,
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        ) {
             Text(
                 template.prompt,
                 style = MaterialTheme.typography.bodySmall,
-                color = TextPrimary.copy(alpha = 0.86f),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 3,
                 overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.sm),
             )
-            Spacer(Modifier.height(6.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                MetaText(
-                    listOfNotNull(
-                        template.model?.let { "模型 $it" },
-                        template.steps?.let { "${it}步" },
-                        template.cfg?.let { "CFG ${trimNum(it)}" },
-                        if (template.width != null && template.height != null) "${template.width}×${template.height}" else null,
-                    ).joinToString(" · "),
-                    modifier = Modifier.weight(1f),
-                )
-                TextButton(onClick = { vm.applyTemplate(template) }) { Text("应用") }
-            }
         }
+
+        Spacer(Modifier.height(Spacing.sm))
+        MetaText(templateMeta(template, state.presets))
     }
 }
+
+/** 用户模板标记。 */
+@Composable
+private fun MyTemplateBadge() {
+    Surface(
+        shape = AnimaShape.pill,
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+    ) {
+        Text(
+            "我的",
+            style = MaterialTheme.typography.labelSmall,
+            letterSpacing = 0.sp,
+            modifier = Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.xxs),
+        )
+    }
+}
+
+/** 模板参数摘要：模型展示名 · 步数 · CFG · 尺寸。 */
+private fun templateMeta(template: PromptTemplate, presets: List<ModelPreset>): String {
+    val model = template.model?.let { id -> presets.firstOrNull { it.id == id }?.display ?: id }
+    return listOfNotNull(
+        model?.let { "模型 $it" },
+        template.steps?.let { "${it} 步" },
+        template.cfg?.let { "CFG ${formatCfg(it)}" },
+        if (template.width != null && template.height != null) "${template.width}×${template.height}" else null,
+    ).joinToString(" · ")
+}
+
+/**
+ * CFG 小工具：4.5 → "4.5"，4.0 → "4"，4.25 → "4.25"。
+ *
+ * 旧版借用了 GenerateScreen.kt 里的 trimNum；这里自带实现，避免跨屏幕耦合。
+ */
+private fun formatCfg(value: Double): String =
+    String.format(Locale.US, "%.2f", value).trimEnd('0').trimEnd('.')

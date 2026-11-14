@@ -2,10 +2,30 @@
 
 ## 技术栈
 
-- Kotlin + Jetpack Compose（Material3，暗色主题），AGP 9.5.1 / Kotlin 2.4.21 / Compose BOM 2026.09.00
+- Kotlin + Jetpack Compose，**Material 3 Expressive**（`androidx.compose.material3:1.5.0-rc01`，显式覆盖 BOM 的 1.4.0），
+  AGP 9.5.1 / Kotlin 2.4.21 / Compose BOM 2026.09.00
 - OkHttp 4.12（HTTP + WebSocket）、kotlinx-coroutines、org.json（Android 自带）
-- 单 Activity + 底部 4 Tab（生成 / 图库 / 速查 / 设置），无导航库
+- 单 Activity + 底部 4 Tab（生成 / 图库 / 速查 / 设置），无导航库；M3 Expressive `ShortNavigationBar` + `AnimatedContent` 切页
+- 深/浅色 + Android 12+ Material You 动态取色（可在设置页切换跟随系统/浅色/深色、动态取色开关）
 - 所有配置与用户模板存 SharedPreferences；图片经 MediaStore 存 `Pictures/AnimaColab`
+
+## 设计系统与外观
+
+设计规范见 `docs/DESIGN.md`，Google 最新标准研究见 `docs/design/m3-expressive-reference.md`。
+
+- **主题**（`ui/theme/Theme.kt`）：`MaterialExpressiveTheme` + `MotionScheme.expressive()`；
+  动态取色优先，关闭时用品牌色板（电光紫 primary / 蜜桃粉 secondary / 青柠蓝 tertiary，深浅两套均校准对比度）；
+  语义扩展色（success/warning）通过 `LocalAnimaExtendedColors` 提供，`MaterialTheme.extended` 读取。
+- **令牌**（`ui/theme/Tokens.kt`）：8dp 间距刻度 `Spacing`、形状 `AnimaShape`（Hero 32dp / 卡片 26dp / 输入 18dp / 胶囊按钮，
+  另含 `MaterialShapes` 形状库装饰）、动效 `AnimaMotion`（对齐 M3 Expressive spring 参数；尺寸类用 `spatialSize`）。
+- **组件**（`ui/Components.kt`）：`ExpressiveCard`、`ScreenHeader`、`SectionLabel`、`StatusPill`、`ChoiceChips`、
+  `SegmentedOptions`、`PrimaryActionButton`、`SecondaryActionButton`、`SettingRow/SettingSwitchRow`、
+  `AnimaSliderRow`、`AnimaTextField`、`DropdownField`、`EmptyState`、`ShapeDecoration`、`NetworkImage`、
+  `MetaText`、`InfoRow`、`Modifier.pressScale`、`AnimatedChevron` 等，所有屏幕复用。
+- **外观设置**（`data/Appearance.kt` + `ConfigStore` + `UiState`）：`ThemeMode{System,Light,Dark}` 与
+  `dynamicColor` 持久化，`MainActivity` 实时换主题并同步系统栏图标明暗。
+- **Shell**：`enableEdgeToEdge()`，Scaffold 统一处理状态栏/底部导航 insets；底部短导航栏 4 项；
+  返回键先回「生成」；启动页/自适应图标/单色图标（`res/mipmap-anydpi-v26` + `values-v31/themes.xml`）。
 
 ## 模块
 
@@ -22,12 +42,14 @@ data/
   NotebookExporter.kt 已移除（备用笔记本改为 SAF 导出：见 SettingsScreen）
 AppViewModel.kt     单一 StateFlow<UiState>，连接/生成/进度/历史/图片保存
 ui/
-  GenerateScreen.kt 提示词/模型/参数/生成/进度/结果卡
-  GalleryScreen.kt  服务器历史网格 + 大图查看
-  ExploreScreen.kt  Tag 速查（295 个）+ 模板
-  SettingsScreen.kt 配对、服务器信息、使用说明、关于
-  ImageViewer.kt    全屏 Pager 看图（保存/分享/填回参数）
-  Components.kt     通用组件 + NetworkImage
+  GenerateScreen.kt 提示词/模型/参数/SplitButton 生成/波浪进度/结果卡（M3 Expressive Hero 卡）
+  GalleryScreen.kt  服务器历史双列错落网格 + 空/加载/错误态（historyError）
+  ExploreScreen.kt  Tag 速查（288 个）+ 模板，分类 Tab、正/负向插入
+  SettingsScreen.kt 连接状态机 Hero、外观设置、通知/配对/服务器/说明/关于
+  ImageViewer.kt    全屏 Pager 看图（浮动工具栏保存/分享/填回参数）
+  Components.kt     M3 Expressive 共享组件库 + NetworkImage
+  theme/Theme.kt    主题（动态取色/品牌色板/扩展语义色）
+  theme/Tokens.kt   间距/形状/动效令牌
 ```
 
 ## 一键启动 Colab（colab/ 包）
@@ -72,11 +94,17 @@ colab/
    - 每 2s 轮询 `/anima/v1/history/{prompt_id}` 兜底（WS 断了也能完成）
 6. 拿到图片后拉 `/animai/v1/history` 刷新图库；`/view` 下载图片显示/保存/分享
 
-## 调试
+## 调试 / 真机视觉验收
 
 ```bash
 adb logcat -s AndroidRuntime:* animacolab:*     # 崩溃
 adb shell run-as com.tom.animacolab ls files     # 沙箱内数据
+
+# 无需 Colab：本机 mock 网关 + adb reverse + 自动截图（深/浅色、动态取色、空/错误/生成中/结果）
+scripts/device_shots.sh --install --phase full   # → docs/screenshots/redesign/ + 视觉 QA 报告
+# 只起 mock 网关（127.0.0.1:8091）手工联调：
+python3 scripts/mock_gateway.py
+adb reverse tcp:8091 tcp:8091
 ```
 
 配对信息可以用下面方式免手输注入（debug 包）：

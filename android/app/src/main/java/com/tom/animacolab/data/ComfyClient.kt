@@ -143,7 +143,10 @@ class ComfyClient {
                 parse(obj)
             }
         } catch (e: IOException) {
-            throw ApiException("连不上 Colab 服务：${e.message ?: "网络错误"}", e)
+            throw ApiException(
+                "连不上 Colab 服务，请检查手机网络/代理后重试，或点「一键重启 Colab」重新申请会话",
+                e,
+            )
         }
     }
 

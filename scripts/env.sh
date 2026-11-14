@@ -17,3 +17,16 @@ if [ -z "${JAVA_HOME:-}" ]; then
         fi
     fi
 fi
+
+# Gradle 用户目录：默认用 ~/.gradle（复用已下载的 Gradle/依赖）；若 home 不可写
+# （例如 agent 沙箱、只读挂载），退回项目内的 .gradle-user-home，保证构建可用。
+if [ -z "${GRADLE_USER_HOME:-}" ]; then
+    ANIMA_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+    if [ -w "${HOME:-/nonexistent}/.gradle" ] \
+        || { [ ! -e "${HOME:-/nonexistent}/.gradle" ] && [ -w "${HOME:-/nonexistent}" ]; }; then
+        export GRADLE_USER_HOME="$HOME/.gradle"
+    else
+        export GRADLE_USER_HOME="$ANIMA_ROOT/.gradle-user-home"
+    fi
+    unset ANIMA_ROOT
+fi

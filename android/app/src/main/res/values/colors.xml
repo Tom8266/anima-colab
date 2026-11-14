@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 品牌启动色：深紫夜色 + 星光，深浅色模式共用 -->
+    <color name="anima_splash_background">#1A1230</color>
+    <color name="ic_launcher_background">#1A1230</color>
+</resources>

@@ -1,0 +1,18 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- 主星光：M3 Expressive 的软爆裂感 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,24 C55.6,38.2 61.8,44.4 76,46 C61.8,47.6 55.6,53.8 54,68 C52.4,53.8 46.2,47.6 32,46 C46.2,44.4 52.4,38.2 54,24 Z" />
+    <!-- 副星光 -->
+    <path
+        android:fillColor="#FFD8E7"
+        android:pathData="M76,62 C76.8,68.6 79.4,71.2 86,72 C79.4,72.8 76.8,75.4 76,82 C75.2,75.4 72.6,72.8 66,72 C72.6,71.2 75.2,68.6 76,62 Z" />
+    <!-- 小点缀 -->
+    <path
+        android:fillColor="#B5EBFB"
+        android:pathData="M36,68 C36.5,71.7 38,73.5 42,74 C38,74.5 36.5,76.3 36,80 C35.5,76.3 34,74.5 30,74 C34,73.5 35.5,71.7 36,68 Z" />
+</vector>

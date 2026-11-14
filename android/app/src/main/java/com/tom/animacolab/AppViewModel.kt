@@ -27,6 +27,7 @@ import com.tom.animacolab.data.ServerInfo
 import com.tom.animacolab.data.Snippet
 import com.tom.animacolab.data.Tag
 import com.tom.animacolab.data.TagCategory
+import com.tom.animacolab.data.ThemeMode
 import com.tom.animacolab.colab.ColabSessionManager
 import com.tom.animacolab.colab.ColabSessionStore
 import kotlinx.coroutines.CancellationException
@@ -57,6 +58,7 @@ data class UiState(
     val serverQueue: QueueStatus = QueueStatus(0, 0),
     val history: List<HistoryItem> = emptyList(),
     val historyLoading: Boolean = false,
+    val historyError: String? = null,
     val viewerItem: HistoryItem? = null,
     val viewerRef: ImageRef? = null,
     val viewerLoading: Boolean = false,
@@ -68,6 +70,8 @@ data class UiState(
     val authUrlToOpen: String? = null,
     val autoDownload: Boolean = true,
     val backgroundKeepalive: Boolean = true,
+    val themeMode: ThemeMode = ThemeMode.System,
+    val dynamicColor: Boolean = false,
 ) {
     val availableModels: List<Pair<ModelPreset, String>> get() = buildAvailable(info, presets)
     val currentPreset: ModelPreset? get() = presets.firstOrNull { it.id == form.modelId }
@@ -126,6 +130,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 templates = assets.templates + store.userTemplates(),
                 autoDownload = store.autoDownload,
                 backgroundKeepalive = store.backgroundKeepalive,
+                themeMode = store.themeMode,
+                dynamicColor = store.dynamicColor,
                 connection = if (config.configured) ConnectionState.Checking else ConnectionState.NotConfigured,
             )
         }
@@ -199,8 +205,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 }
             } catch (e: ApiException) {
                 _state.update { it.copy(connection = ConnectionState.Error(e.userMessage)) }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
-                _state.update { it.copy(connection = ConnectionState.Error(e.message ?: "连接失败")) }
+                _state.update {
+                    it.copy(connection = ConnectionState.Error("连接 Colab 失败，请检查网络/代理后重试"))
+                }
             }
         }
     }
@@ -260,6 +270,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         store.backgroundKeepalive = enabled
         colabSession.setBackgroundKeepaliveEnabled(enabled)
         _state.update { it.copy(backgroundKeepalive = enabled) }
+    }
+
+    // ---------------- 外观 ----------------
+
+    fun setThemeMode(mode: ThemeMode) {
+        store.themeMode = mode
+        _state.update { it.copy(themeMode = mode) }
+    }
+
+    fun setDynamicColor(enabled: Boolean) {
+        store.dynamicColor = enabled
+        _state.update { it.copy(dynamicColor = enabled) }
     }
 
     // ---------------- 一键 Colab 会话 ----------------
@@ -711,14 +733,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun refreshHistory() {
         val config = _state.value.config
         if (!config.configured) return
-        _state.update { it.copy(historyLoading = true) }
+        _state.update { it.copy(historyLoading = true, historyError = null) }
         viewModelScope.launch {
             try {
                 val items = client.history(config.baseUrl, config.token, 60)
-                _state.update { it.copy(history = items, historyLoading = false) }
+                _state.update { it.copy(history = items, historyLoading = false, historyError = null) }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
-                _state.update { it.copy(historyLoading = false) }
-                message("历史加载失败：${e.message ?: ""}")
+                val detail = (e as? ApiException)?.userMessage ?: "历史加载失败，请检查网络后重试"
+                _state.update {
+                    it.copy(historyLoading = false, historyError = detail)
+                }
             }
         }
     }
