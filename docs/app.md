@@ -17,8 +17,9 @@ data/
   ConfigStore.kt    SharedPreferences：配对信息、表单、用户模板
   Assets.kt         assets/models.json、tags.json、templates.json 读取（带兜底）
   Pairing.kt        PAIR 行解析（url|token / 双行 / JSON）
-  ImageLoader.kt    OkHttp 带 token 图片下载 + LruCache + 缩采样
-  AppLinks.kt       Colab 笔记本链接
+  ImageLoader.kt    OkHttp 带 token 图片下载 + 字节缓存 + 缩采样
+  LocalImageStore.kt 出图自动下载到 App 私有存储（不写相册）
+  NotebookExporter.kt 已移除（备用笔记本改为 SAF 导出：见 SettingsScreen）
 AppViewModel.kt     单一 StateFlow<UiState>，连接/生成/进度/历史/图片保存
 ui/
   GenerateScreen.kt 提示词/模型/参数/生成/进度/结果卡

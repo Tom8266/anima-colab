@@ -1,10 +1,9 @@
 package com.tom.animacolab.ui
 
-import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
-import android.content.Intent
-import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -46,7 +45,6 @@ import com.tom.animacolab.AppViewModel
 import com.tom.animacolab.BuildConfig
 import com.tom.animacolab.UiState
 import com.tom.animacolab.colab.ColabSessionManager
-import com.tom.animacolab.data.AppLinks
 import com.tom.animacolab.data.ConnectionState
 import com.tom.animacolab.ui.theme.ErrorColor
 import com.tom.animacolab.ui.theme.Primary
@@ -59,6 +57,19 @@ import com.tom.animacolab.ui.theme.WarningColor
 fun SettingsScreen(vm: AppViewModel, state: UiState) {
     val context = LocalContext.current
     var showAdvanced by rememberSaveable { mutableStateOf(false) }
+    val notebookExport = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/x-ipynb+json"),
+    ) { uri ->
+        if (uri != null) {
+            val ok = runCatching {
+                context.contentResolver.openOutputStream(uri)?.use { out ->
+                    context.assets.open("anima_colab.ipynb").use { input -> input.copyTo(out) }
+                    true
+                } ?: false
+            }.getOrDefault(false)
+            vm.message(if (ok) "笔记本已导出；上传到 Google Drive 后可在 Colab 打开" else "导出失败")
+        }
+    }
     var url by remember { mutableStateOf(state.config.baseUrl) }
     var token by remember { mutableStateOf(state.config.token) }
 
@@ -201,16 +212,18 @@ fun SettingsScreen(vm: AppViewModel, state: UiState) {
                 lineHeight = 20.sp,
             )
             Spacer(Modifier.height(10.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(
-                    onClick = { openUrl(context, AppLinks.NOTEBOOK_URL) },
-                    modifier = Modifier.weight(1f),
-                ) { Text("打开备用笔记本") }
-                OutlinedButton(
-                    onClick = { copyText(context, AppLinks.NOTEBOOK_URL); vm.message("笔记本链接已复制") },
-                    modifier = Modifier.weight(1f),
-                ) { Text("复制链接") }
-            }
+            OutlinedButton(
+                onClick = { notebookExport.launch("anima_colab.ipynb") },
+                modifier = Modifier.fillMaxWidth(),
+            ) { Text("导出备用笔记本（.ipynb）") }
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "导出后：把 anima_colab.ipynb 上传到 Google Drive → 用 Colab 打开 →「全部运行」→ 复制打印的 PAIR 行，" +
+                    "回到「手动配对」粘贴即可作为备用方案。",
+                style = MaterialTheme.typography.labelSmall,
+                color = TextSecondary,
+                lineHeight = 17.sp,
+            )
             Spacer(Modifier.height(8.dp))
             Text(
                 "注意：\n" +
@@ -385,13 +398,3 @@ private fun readClipboard(context: Context): String {
     }.trim()
 }
 
-private fun copyText(context: Context, text: String) {
-    val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager ?: return
-    cm.setPrimaryClip(ClipData.newPlainText("anima", text))
-}
-
-private fun openUrl(context: Context, url: String) {
-    runCatching {
-        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-    }
-}

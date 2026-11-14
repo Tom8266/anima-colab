@@ -43,7 +43,7 @@
 
 ## 备用：手动配对（笔记本模式）
 
-1. **起服务端**：手机浏览器 / Colab App 打开 `anima_colab.ipynb` →「全部运行」。
+1. **起服务端**：设置页「怎么用 → 导出备用笔记本」，把导出的 `anima_colab.ipynb` 上传 Google Drive 后用 Colab 打开 →「全部运行」。
    首次会装 ComfyUI + 下载 base 模型（约 5.3GB，3-5 分钟），跑完最后打印：
    ```
    PAIR: https://xxxx.trycloudflare.com|<token>
