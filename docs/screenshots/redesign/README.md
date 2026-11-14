@@ -1,10 +1,12 @@
 # 重设计真机截图（Material 3 Expressive）
 
 全部为真机截图（Xiaomi M2012K11AC · Android 17 / API 37 · 1080×2400 @440dpi，即 392×873dp）。
+2026-11-14 22:36–22:40 用最终 APK（md5 `261d56ac3ee9a962b74cb8644d91e47c`）重拍。
 数据来自本地 mock 网关（`scripts/mock_gateway.py`），不依赖真实 Colab 会话；可一键复现：
 
 ```bash
-scripts/device_shots.sh --install --phase full
+scripts/device_shots.sh --install --phase full            # 15 张交付截图
+scripts/device_shots.sh --install --phase full --extras   # 另拍键盘/弹窗/字体/横屏 → docs/screenshots/qa/
 ```
 
 ## 截图清单
@@ -23,7 +25,7 @@ scripts/device_shots.sh --install --phase full
 | `10-light-settings.png` | 设置页（主题模式/动态取色开关/品牌色板） | 浅色 + 品牌色 |
 | `11-empty-gallery.png` | 空图库空态（装饰形状 + 去生成 CTA） | 深色 + 品牌色 |
 | `12-error-generate.png` | 连接失败错误态（中文可执行建议 + 重试） | 深色 + 品牌色 |
-| `13-generate-running.png` | 生成中（波浪进度 / 百分比 / 已用时长 / 中断） | 深色 + 品牌色 |
+| `13-generate-running.png` | 生成中（波浪进度 / 百分比 / 已用时长 / 中断；无双进度） | 深色 + 品牌色 |
 | `14-generate-result.png` | 生成完成结果卡（大图 + 保存/分享/填回/图库） | 深色 + 品牌色 |
 | `15-dynamic-color.png` | **Material You 动态取色**（与 01 对照，证明壁纸取色生效） | 深色 + 动态取色 |
 
@@ -35,6 +37,7 @@ scripts/device_shots.sh --install --phase full
 
 > 旧版 UI 截图保留在 `docs/screenshots/legacy/`，仅作历史对照。
 
-> **注意**：2026-11-14 晚的 P2 追补修复（Hero 装饰形状、分类 Tab 渐隐、空态装饰、常驻进度条判定、
-> Viewer 顶部胶囊）尚未重拍，本目录截图仍是修复前版本；修复说明与复验清单见
-> [`docs/design/visual-qa.md` §10](../../design/visual-qa.md)。
+> 2026-11-14 最终复验已完成：P2-3 / P2-5 / P2-6、结果卡 meta 换行、存为模板弹窗、
+> SplitButton 菜单锚点、速查横屏 compact 布局均已修复并重拍。交互态补充图（键盘、弹窗、
+> 字体放大 1.3、横屏）在 [`docs/screenshots/qa/`](../qa/README.md)，修复明细见
+> [`docs/design/visual-qa.md` §11](../../design/visual-qa.md)。

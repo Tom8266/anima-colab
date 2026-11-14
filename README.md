@@ -97,7 +97,10 @@ scripts/build.sh release    # release（未签名）
 ```bash
 scripts/device_shots.sh --install --phase full          # 深/浅色、各页面状态截图 → docs/screenshots/redesign/
 scripts/device_shots.sh --install --phase full --dim    # 同上，面板亮度压到 1（护 AMOLED，截图不受影响）
+scripts/device_shots.sh --install --phase full --extras # 另拍键盘/弹窗/字体放大/横屏 → docs/screenshots/qa/
 ```
+
+`--extras` 退出时会恢复面板亮度、字体缩放与旋转；横屏下速查页自动切成 compact 布局。
 
 真机调试默认「熄屏 + 侧边栏镜像」——约定写在 [AGENTS.md](AGENTS.md)，原理与排错见
 [docs/device-debug.md](docs/device-debug.md)：

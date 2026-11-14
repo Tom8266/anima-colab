@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -188,20 +187,9 @@ private fun ColabSection(vm: AppViewModel, state: UiState, context: Context) {
     SectionLabel("Colab 一键启动")
     ExpressiveCard(shape = AnimaShape.hero, containerColor = container, contentColor = onContainer) {
         Box(Modifier.fillMaxWidth()) {
-            // 装饰形状只保留右侧 1 个：原先右上角的大 cookie 会被状态 pill/标题压住，
-            // 浅色下还会和 pill 融成一片（视觉 QA P2-3）。少量形状更克制。
-            Box(Modifier.matchParentSize()) {
-                ShapeDecoration(
-                    Modifier
-                        .align(Alignment.TopEnd)
-                        .size(56.dp)
-                        .offset(x = 8.dp, y = 44.dp),
-                    tint = MaterialTheme.colorScheme.secondary,
-                    shape = AnimaShape.sunny,
-                    rotation = -16f,
-                    alpha = 0.18f,
-                )
-            }
+            // 这里不放装饰形状：卡片右上角是状态 pill，下面是「退出登录」，
+            // 任何 56dp 形状都会压到前景控件（视觉 QA P2-3 复验仍可见相交）。
+            // 主色容器 + 火箭图标已足够表达 Hero，留白比装饰更干净。
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     Modifier

@@ -10,6 +10,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -108,59 +109,113 @@ fun ExploreScreen(vm: AppViewModel, state: UiState, onBack: () -> Unit) {
     val fadeSpec = motion.defaultEffectsSpec<Float>()
     val scaleSpec = motion.defaultSpatialSpec<Float>()
 
-    Column(
-        Modifier
-            .fillMaxSize()
-            .imePadding(),
-    ) {
-        ScreenHeader(
-            title = "速查",
-            subtitle = "$tagCount 个 Tag · $templateCount 套模板",
-        )
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        // 横屏/小高度时把「大标题 + 副标题 + 整行模式切换」压成一行，
+        // 并把搜索/Tab 行放进列表里滚动；否则固定头部会占满整个高度，
+        // Tag 列表只剩几像素（真机横屏 QA 发现）。竖屏布局保持原样。
+        val compact = maxHeight < 480.dp
+        Column(
+            Modifier
+                .fillMaxSize()
+                .imePadding(),
+        ) {
+            if (compact) {
+                CompactHeader(
+                    tagCount = tagCount,
+                    templateCount = templateCount,
+                    mode = mode,
+                    onModeChange = { mode = it },
+                )
+            } else {
+                ScreenHeader(
+                    title = "速查",
+                    subtitle = "$tagCount 个 Tag · $templateCount 套模板",
+                )
 
+                SegmentedOptions(
+                    options = listOf("Tag 速查", "模板"),
+                    selectedIndex = mode,
+                    onSelect = { mode = it },
+                    modifier = Modifier.padding(horizontal = Spacing.screen),
+                )
+                Spacer(Modifier.height(Spacing.sm))
+            }
+
+            AnimatedContent(
+                targetState = mode,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                contentAlignment = Alignment.TopCenter,
+                transitionSpec = {
+                    (fadeIn(animationSpec = fadeSpec) + scaleIn(animationSpec = scaleSpec, initialScale = 0.98f))
+                        .togetherWith(
+                            fadeOut(animationSpec = fadeSpec) + scaleOut(animationSpec = scaleSpec, targetScale = 0.99f),
+                        )
+                },
+                label = "exploreModeTransition",
+            ) { current ->
+                if (current == 0) {
+                    TagsContent(
+                        vm = vm,
+                        state = state,
+                        query = tagQuery,
+                        onQueryChange = { tagQuery = it },
+                        categoryId = categoryId,
+                        onCategoryChange = { categoryId = it },
+                        positive = positive,
+                        onPositiveChange = { positive = it },
+                        compact = compact,
+                    )
+                } else {
+                    TemplatesContent(
+                        vm = vm,
+                        state = state,
+                        query = templateQuery,
+                        onQueryChange = { templateQuery = it },
+                        onGoGenerate = onBack,
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** 小高度（横屏）下的顶部栏：标题 + 计数 + 模式切换同排，给列表留出高度。 */
+@Composable
+private fun CompactHeader(
+    tagCount: Int,
+    templateCount: Int,
+    mode: Int,
+    onModeChange: (Int) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = Spacing.screen, vertical = Spacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                "速查",
+                style = MaterialTheme.typography.headlineSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                "$tagCount Tag · $templateCount 模板",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+        Spacer(Modifier.width(Spacing.md))
         SegmentedOptions(
             options = listOf("Tag 速查", "模板"),
             selectedIndex = mode,
-            onSelect = { mode = it },
-            modifier = Modifier.padding(horizontal = Spacing.screen),
+            onSelect = onModeChange,
+            modifier = Modifier.width(232.dp),
         )
-        Spacer(Modifier.height(Spacing.sm))
-
-        AnimatedContent(
-            targetState = mode,
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f),
-            contentAlignment = Alignment.TopCenter,
-            transitionSpec = {
-                (fadeIn(animationSpec = fadeSpec) + scaleIn(animationSpec = scaleSpec, initialScale = 0.98f))
-                    .togetherWith(
-                        fadeOut(animationSpec = fadeSpec) + scaleOut(animationSpec = scaleSpec, targetScale = 0.99f),
-                    )
-            },
-            label = "exploreModeTransition",
-        ) { current ->
-            if (current == 0) {
-                TagsContent(
-                    vm = vm,
-                    state = state,
-                    query = tagQuery,
-                    onQueryChange = { tagQuery = it },
-                    categoryId = categoryId,
-                    onCategoryChange = { categoryId = it },
-                    positive = positive,
-                    onPositiveChange = { positive = it },
-                )
-            } else {
-                TemplatesContent(
-                    vm = vm,
-                    state = state,
-                    query = templateQuery,
-                    onQueryChange = { templateQuery = it },
-                    onGoGenerate = onBack,
-                )
-            }
-        }
     }
 }
 
@@ -178,6 +233,7 @@ private fun TagsContent(
     onCategoryChange: (String) -> Unit,
     positive: Boolean,
     onPositiveChange: (Boolean) -> Unit,
+    compact: Boolean,
 ) {
     val categories = state.tagCategories
     // 选中分类在「全部(0) + categories」里的下标；分类数据变化或 id 失效时回退到「全部」。
@@ -216,49 +272,23 @@ private fun TagsContent(
     }
 
     Column(Modifier.fillMaxSize()) {
-        // 搜索 + 插入位置同一行：把首屏留给 Tag 列表。
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = Spacing.screen),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            AnimaTextField(
-                value = query,
-                onValueChange = onQueryChange,
-                modifier = Modifier.weight(1f),
-                label = "搜索 Tag（中/英文）",
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                leadingIcon = Icons.Outlined.Search,
-                trailingIcon = if (query.isNotEmpty()) {
-                    {
-                        IconButton(onClick = { onQueryChange("") }) {
-                            Icon(
-                                Icons.Outlined.Close,
-                                contentDescription = "清除搜索",
-                                modifier = Modifier.size(20.dp),
-                            )
-                        }
-                    }
-                } else {
-                    null
-                },
-            )
-            Spacer(Modifier.width(Spacing.sm))
-            InsertTargetToggle(
+        if (!compact) {
+            // 搜索 + 插入位置同一行：把首屏留给 Tag 列表。
+            TagSearchRow(
+                query = query,
+                onQueryChange = onQueryChange,
                 positive = positive,
                 onPositiveChange = onPositiveChange,
             )
-        }
-        Spacer(Modifier.height(Spacing.xs))
+            Spacer(Modifier.height(Spacing.xs))
 
-        CategoryTabRow(
-            categories = categories,
-            selectedIndex = selectedCategoryIndex,
-            resultCount = filtered.size,
-            onSelect = { onCategoryChange(it) },
-        )
+            CategoryTabRow(
+                categories = categories,
+                selectedIndex = selectedCategoryIndex,
+                resultCount = filtered.size,
+                onSelect = { onCategoryChange(it) },
+            )
+        }
 
         LazyColumn(
             state = listState,
@@ -268,6 +298,26 @@ private fun TagsContent(
             contentPadding = PaddingValues(top = Spacing.xs, bottom = Spacing.xxl),
             verticalArrangement = Arrangement.spacedBy(Spacing.sm),
         ) {
+            // 横屏/小高度：搜索与分类 Tab 跟着列表滚，避免固定头部挤掉整个列表。
+            if (compact) {
+                item(key = "searchRow") {
+                    TagSearchRow(
+                        query = query,
+                        onQueryChange = onQueryChange,
+                        positive = positive,
+                        onPositiveChange = onPositiveChange,
+                    )
+                }
+                item(key = "categoryTabs") {
+                    CategoryTabRow(
+                        categories = categories,
+                        selectedIndex = selectedCategoryIndex,
+                        resultCount = filtered.size,
+                        onSelect = { onCategoryChange(it) },
+                    )
+                }
+            }
+
             if (state.snippets.isNotEmpty()) {
                 item(key = "snippets") {
                     SnippetsRow(
@@ -310,6 +360,50 @@ private fun TagsContent(
                 }
             }
         }
+    }
+}
+
+/** Tag 搜索框 + 插入位置开关（竖屏固定在顶部，横屏放进列表里）。 */
+@Composable
+private fun TagSearchRow(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    positive: Boolean,
+    onPositiveChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = Spacing.screen),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        AnimaTextField(
+            value = query,
+            onValueChange = onQueryChange,
+            modifier = Modifier.weight(1f),
+            label = "搜索 Tag（中/英文）",
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+            leadingIcon = Icons.Outlined.Search,
+            trailingIcon = if (query.isNotEmpty()) {
+                {
+                    IconButton(onClick = { onQueryChange("") }) {
+                        Icon(
+                            Icons.Outlined.Close,
+                            contentDescription = "清除搜索",
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+                }
+            } else {
+                null
+            },
+        )
+        Spacer(Modifier.width(Spacing.sm))
+        InsertTargetToggle(
+            positive = positive,
+            onPositiveChange = onPositiveChange,
+        )
     }
 }
 

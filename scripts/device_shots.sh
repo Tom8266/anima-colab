@@ -19,6 +19,7 @@
 #   --serial ID        设备序列号（默认取 $ADB_SERIAL 或 ef9ca6f9）
 #   --no-light         跳过浅色主题截图（09/10）
 #   --dim              把手机面板亮度压到最低（截图取的是帧缓冲，画质不受影响；只为护 AMOLED），退出时恢复
+#   --extras           额外验证键盘态 / 存模板弹窗 / 字体放大 1.3 / 横屏（输出到 docs/screenshots/qa）
 #   -h, --help         显示帮助
 #
 # 环境变量（一般不用改）：
@@ -48,6 +49,11 @@
 #   13-generate-running.png        生成中（进度卡，mock 模拟 WS progress）
 #   14-generate-result.png         生成成功（结果卡，mock 出图）
 #   15-dynamic-color.png           Material You 动态取色（dark + dynamic_color=true 对照）
+#   --extras 额外输出（docs/screenshots/qa/）：
+#   16-keyboard-generate.png       提示词聚焦 + 键盘
+#   17-dialog-save-template.png    存为模板弹窗
+#   18-font-scale-1.3.png          系统字体 1.3× 生成页
+#   19/20-landscape-explore*.png   横屏速查（首屏 / 上滑后）
 #
 # 调试：日志/UI dump 在 .tmp/device_qa/；失败时先看 .tmp/device_qa/mock_gateway.log
 # 示例：
@@ -69,12 +75,17 @@ PORT="${MOCK_PORT:-8091}"
 BASE_URL="http://127.0.0.1:${PORT}"
 TOKEN="${MOCK_TOKEN:-devtoken}"
 OUTDIR="docs/screenshots/redesign"
+QA_OUTDIR="docs/screenshots/qa"
 PHASE="a"
 INSTALL=0
 SKIP_LIGHT=0
 DIM=0
+EXTRAS=0
 ORIG_BRIGHTNESS=""
 ORIG_BRIGHTNESS_MODE=""
+ORIG_FONT_SCALE=""
+ORIG_ROTATION=""
+ORIG_ACCEL_ROTATION=""
 SHOT_SETTLE="${SHOT_SETTLE:-0.8}"
 TAB_Y="${TAB_Y:-2280}"
 GALLERY_CARD_X="${GALLERY_CARD_X:-270}"
@@ -108,6 +119,7 @@ while [ $# -gt 0 ]; do
         --serial)    SERIAL="${2:-}"; shift ;;
         --no-light)  SKIP_LIGHT=1 ;;
         --dim)       DIM=1 ;;
+        --extras)    EXTRAS=1 ;;
         -h|--help)   usage; exit 0 ;;
         *) printf '未知参数: %s\n\n' "$1" >&2; usage; exit 2 ;;
     esac
@@ -164,19 +176,87 @@ dim_screen() {
     fi
 }
 
+# 写 settings 并回读确认：个别 ROM 在退出瞬间会丢设置，写一次不保险。
+put_setting() { # KEY VALUE
+    local key="$1" value="$2" i cur
+    for i in 1 2 3; do
+        adbx shell settings put system "$key" "$value" >/dev/null 2>&1 || true
+        cur=$(adbx shell settings get system "$key" 2>/dev/null | tr -d '\r')
+        [ "$cur" = "$value" ] && return 0
+        sleep 0.2
+    done
+    return 1
+}
+
 restore_brightness() {
     [ "$DIM" -eq 1 ] || return 0
     case "${ORIG_BRIGHTNESS:-}" in
         ''|null) ;;
-        *) adbx shell settings put system screen_brightness "$ORIG_BRIGHTNESS" >/dev/null 2>&1 || true ;;
+        *) put_setting screen_brightness "$ORIG_BRIGHTNESS" || warn "--dim：亮度恢复失败（当前 $(adbx shell settings get system screen_brightness | tr -d '\r')，原 $ORIG_BRIGHTNESS）" ;;
     esac
     case "${ORIG_BRIGHTNESS_MODE:-}" in
         ''|null) ;;
-        *) adbx shell settings put system screen_brightness_mode "$ORIG_BRIGHTNESS_MODE" >/dev/null 2>&1 || true ;;
+        *) put_setting screen_brightness_mode "$ORIG_BRIGHTNESS_MODE" || true ;;
     esac
 }
 
+# --extras 会临时改字体与旋转；无论正常结束还是 Ctrl-C 都恢复。
+restore_device_settings() {
+    case "${ORIG_FONT_SCALE:-}" in
+        ''|null) ;;
+        *) put_setting font_scale "$ORIG_FONT_SCALE" || warn "字体缩放恢复失败（原 $ORIG_FONT_SCALE）" ;;
+    esac
+    case "${ORIG_ROTATION:-}" in
+        ''|null) ;;
+        *) put_setting user_rotation "$ORIG_ROTATION" || true ;;
+    esac
+    case "${ORIG_ACCEL_ROTATION:-}" in
+        ''|null) ;;
+        *) put_setting accelerometer_rotation "$ORIG_ACCEL_ROTATION" || true ;;
+    esac
+    # 只有确实改过设置时才重启，避免普通截图流程退出时把 App 停掉。
+    if [ -n "${ORIG_FONT_SCALE:-}${ORIG_ROTATION:-}${ORIG_ACCEL_ROTATION:-}" ]; then
+        adbx shell am force-stop "$PACKAGE" >/dev/null 2>&1 || true
+    fi
+}
+
 # ---------------------------------------------------------------- 设备状态
+# 等输入法真正弹出（--extras 的键盘态截图用）
+wait_ime() { # [timeout_s]
+    local i
+    for i in $(seq 1 $((${1:-3} * 5))); do
+        if adbx shell dumpsys input_method 2>/dev/null | grep -q 'mInputShown=true'; then
+            sleep 0.3
+            return 0
+        fi
+        sleep 0.2
+    done
+    return 1
+}
+
+hide_ime() {
+    if adbx shell dumpsys input_method 2>/dev/null | grep -q 'mInputShown=true'; then
+        adbx shell input keyevent KEYCODE_BACK >/dev/null 2>&1
+        sleep 0.4
+    fi
+}
+
+# 等系统真正转屏（settings put user_rotation 只是请求，WM 应用有延迟）。
+wait_orientation() { # landscape|portrait [timeout_s]
+    local want="$1" timeout="${2:-6}" i cur
+    for i in $(seq 1 $((timeout * 5))); do
+        cur=$(adbx shell dumpsys display 2>/dev/null \
+            | sed -n 's/.*mCurrentOrientation=\([0-9]*\).*/\1/p' | head -1 | tr -d '\r')
+        case "$want" in
+            landscape) { [ "$cur" = "1" ] || [ "$cur" = "3" ]; } && return 0 ;;
+            portrait)  { [ "$cur" = "0" ] || [ "$cur" = "2" ]; } && return 0 ;;
+            *)         [ -n "$cur" ] && [ "$cur" = "$want" ] && return 0 ;;
+        esac
+        sleep 0.2
+    done
+    return 1
+}
+
 wake_device() {
     if adbx shell dumpsys power 2>/dev/null | grep -q 'mWakefulness=Asleep'; then
         adbx shell input keyevent KEYCODE_WAKEUP >/dev/null 2>&1
@@ -367,22 +447,27 @@ ensure_app_foreground() {
 }
 
 # ---------------------------------------------------------------- 截图
-shot() { # NAME
-    local name="$1" size
+shot_in() { # DIR NAME
+    local dir="$1" name="$2" size
+    mkdir -p "$dir"
     ensure_app_foreground
     wake_device
     sleep "$SHOT_SETTLE"
     adbx shell screencap -p /sdcard/device_qa_shot.png >/dev/null 2>&1
-    if ! adbx pull /sdcard/device_qa_shot.png "$OUTDIR/$name.png" >/dev/null 2>&1; then
+    if ! adbx pull /sdcard/device_qa_shot.png "$dir/$name.png" >/dev/null 2>&1; then
         err "截图失败: $name"
         return 1
     fi
-    size=$(stat -c '%s' "$OUTDIR/$name.png" 2>/dev/null || echo 0)
+    size=$(stat -c '%s' "$dir/$name.png" 2>/dev/null || echo 0)
     if [ "$size" -lt 20000 ]; then
         err "截图异常（文件过小 ${size}B）: $name"
         return 1
     fi
-    log "截图 $c_dim$OUTDIR/$name.png${c_off} (${size}B)"
+    log "截图 $c_dim$dir/$name.png${c_off} (${size}B)"
+}
+
+shot() { # NAME
+    shot_in "$OUTDIR" "$1"
 }
 
 # ---------------------------------------------------------------- mock gateway
@@ -424,6 +509,7 @@ history_count() {
 
 cleanup() {
     restore_brightness
+    restore_device_settings
     adbx reverse --remove "tcp:$PORT" >/dev/null 2>&1 || true
     if [ -n "$GATEWAY_PID" ]; then
         kill "$GATEWAY_PID" >/dev/null 2>&1 || true
@@ -759,8 +845,88 @@ full_extra_shots() {
     shot 15-dynamic-color || true
 }
 
+# --extras：补拍截图覆盖不到的交互态（键盘 / 弹窗 / 字体放大 / 横屏）。
+# 输出到 docs/screenshots/qa/，与 15 张交付截图分开，避免混入干净的设计稿。
+qa_extra_shots() {
+    step "16 键盘输入态（生成页提示词）"
+    ORIG_FONT_SCALE=$(adbx shell settings get system font_scale 2>/dev/null | tr -d '\r')
+    ORIG_ROTATION=$(adbx shell settings get system user_rotation 2>/dev/null | tr -d '\r')
+    ORIG_ACCEL_ROTATION=$(adbx shell settings get system accelerometer_rotation 2>/dev/null | tr -d '\r')
+
+    restart_app
+    inject_prefs dark false "$TOKEN" "$BASE_URL"
+    restart_app
+    dismiss_system_prompts
+    wait_connected 30 || true
+    tap_tab 生成 || true
+    sleep 0.8
+    if tap_text "safe, 1girl" 0 2180; then
+        if wait_ime 3; then
+            shot_in "$QA_OUTDIR" 16-keyboard-generate || true
+        else
+            warn "16：输入法没有弹出，键盘态截图可能无效"
+        fi
+        hide_ime
+    else
+        warn "16：没找到提示词输入框"
+    fi
+
+    step "17 存为模板弹窗（输入框对比度 + 自动聚焦）"
+    scroll_until_text "存为模板" 3 || true
+    if tap_text "存为模板" 0 2180; then
+        sleep 1.0
+        shot_in "$QA_OUTDIR" 17-dialog-save-template || true
+        if ! tap_text "取消" 0 2180; then
+            adbx shell input keyevent KEYCODE_BACK >/dev/null 2>&1 || true
+        fi
+        sleep 0.5
+    else
+        warn "17：没找到「存为模板」入口"
+    fi
+
+    step "18 字体放大 1.3（生成页）"
+    adbx shell settings put system font_scale 1.3 >/dev/null 2>&1 || warn "18：字体缩放设置失败"
+    restart_app
+    dismiss_system_prompts
+    wait_connected 30 || true
+    shot_in "$QA_OUTDIR" 18-font-scale-1.3 || true
+
+    step "19 横屏速查（compact 布局）"
+    case "${ORIG_FONT_SCALE:-}" in
+        ''|null) adbx shell settings put system font_scale 1.0 >/dev/null 2>&1 || true ;;
+        *) adbx shell settings put system font_scale "$ORIG_FONT_SCALE" >/dev/null 2>&1 || true ;;
+    esac
+    adbx shell settings put system accelerometer_rotation 0 >/dev/null 2>&1 || true
+    adbx shell settings put system user_rotation 1 >/dev/null 2>&1 || true
+    if wait_orientation landscape 6; then
+        # 让 Activity 完成旋转重建；不重启 App —— force-stop/start 会抢在 WM 转屏完成之前。
+        sleep 1.5
+        ensure_app_foreground
+        # 横屏下底部导航在 y≈980，固定坐标不适用；用 y 范围过滤出导航标签。
+        tap_text "速查" 850 1080 || tap_xy 1495 980
+        sleep 1.2
+        shot_in "$QA_OUTDIR" 19-landscape-explore || true
+        adbx shell input swipe 1200 720 1200 320 300 >/dev/null 2>&1
+        sleep 0.8
+        shot_in "$QA_OUTDIR" 20-landscape-explore-list || true
+    else
+        warn "19：设备没有旋转到横屏，跳过横屏截图（检查系统旋转锁/设置）"
+    fi
+
+    # 恢复字体 / 旋转，并重启到竖屏常态
+    adbx shell settings put system user_rotation "${ORIG_ROTATION:-0}" >/dev/null 2>&1 || true
+    adbx shell settings put system accelerometer_rotation "${ORIG_ACCEL_ROTATION:-1}" >/dev/null 2>&1 || true
+    wait_orientation portrait 6 || warn "恢复竖屏超时"
+    sleep 0.8
+    restart_app
+    # 已恢复：让 cleanup 不要把 App 再停掉
+    ORIG_FONT_SCALE=""
+    ORIG_ROTATION=""
+    ORIG_ACCEL_ROTATION=""
+}
+
 restore_state() {
-    step "恢复常规状态（深色 + 动态取色 + 正常 mock 配置）"
+    step "恢复常规状态（深色 + 品牌色板 + 正常 mock 配置）"
     restart_app
     inject_prefs dark false "$TOKEN" "$BASE_URL"
     restart_app
@@ -788,6 +954,9 @@ light_shots
 if [ "$PHASE" = "full" ]; then
     full_extra_shots
 fi
+if [ "$EXTRAS" -eq 1 ]; then
+    qa_extra_shots
+fi
 restore_state
 
 # ---------------------------------------------------------------- 汇总
@@ -798,14 +967,15 @@ for f in "$OUTDIR"/*.png; do
     printf '  %-32s %10s\n' "$(basename "$f")" "$(stat -c '%s' "$f" 2>/dev/null)"
 done
 
-if [ "$PHASE" = "a" ]; then
-    REQUIRED=(01-generate 02-params-expanded 03-gallery 04-viewer 05-explore-tags \
-              06-explore-templates 07-settings 08-settings-manual-pairing)
-    [ "$SKIP_LIGHT" -eq 0 ] && REQUIRED+=(09-light-generate 10-light-settings)
-else
-    REQUIRED=(01-generate 02-params-expanded 03-gallery 04-viewer 05-explore-tags \
-              06-explore-templates 07-settings 08-settings-manual-pairing \
-              09-light-generate 10-light-settings)
+REQUIRED=(01-generate 02-params-expanded 03-gallery 04-viewer 05-explore-tags \
+          06-explore-templates 07-settings 08-settings-manual-pairing)
+if [ "$SKIP_LIGHT" -eq 0 ]; then
+    REQUIRED+=(09-light-generate 10-light-settings)
+fi
+if [ "$PHASE" = "full" ]; then
+    # full 的 11–15 是独立流程，缺一张都应该报错（之前漏在 REQUIRED 之外，可能静默少图）。
+    REQUIRED+=(11-empty-gallery 12-error-generate 13-generate-running \
+               14-generate-result 15-dynamic-color)
 fi
 missing_count=0
 for name in "${REQUIRED[@]}"; do

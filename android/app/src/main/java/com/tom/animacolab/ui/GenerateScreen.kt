@@ -94,6 +94,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -683,7 +685,14 @@ private fun ModelCard(state: UiState, vm: AppViewModel) {
     SectionLabel(
         "模型",
         trailing = {
-            if (models.isNotEmpty()) MetaText("已装 ${models.size} 个")
+            if (models.isNotEmpty()) {
+                // 中文 + 数字不要走等宽 MetaText：等宽字体给中文/空格加宽，会显得字距散。
+                Text(
+                    "已装 ${models.size} 个",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         },
     )
     ExpressiveCard(modifier = Modifier.fillMaxWidth()) {
@@ -1237,55 +1246,58 @@ private fun GenerateAction(
                 }
             },
             trailingButton = {
-                SplitButtonDefaults.TrailingButton(
-                    checked = menuOpen,
-                    onCheckedChange = { menuOpen = it },
-                    enabled = !active,
-                    shapes = trailingShapes,
-                    contentPadding = trailingPadding,
-                ) {
-                    Icon(
-                        Icons.Filled.KeyboardArrowDown,
-                        contentDescription = "更多生成选项",
-                        modifier = Modifier.size(ButtonDefaults.MediumIconSize),
-                    )
+                Box {
+                    SplitButtonDefaults.TrailingButton(
+                        checked = menuOpen,
+                        onCheckedChange = { menuOpen = it },
+                        enabled = !active,
+                        shapes = trailingShapes,
+                        contentPadding = trailingPadding,
+                    ) {
+                        Icon(
+                            Icons.Filled.KeyboardArrowDown,
+                            contentDescription = "更多生成选项",
+                            modifier = Modifier.size(ButtonDefaults.MediumIconSize),
+                        )
+                    }
+                    // 锚在展开按钮上：放在外层 Box 会从整行左端弹出，离触发点很远。
+                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                        DropdownMenuItem(
+                            text = { Text("随机种子并生成") },
+                            leadingIcon = { Icon(Icons.Outlined.Shuffle, contentDescription = null) },
+                            enabled = ready && !active,
+                            onClick = {
+                                menuOpen = false
+                                vm.setSeedText(PromptBuilder.randomSeed().toString())
+                                generateNow()
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("存为模板") },
+                            leadingIcon = { Icon(Icons.Outlined.BookmarkAdd, contentDescription = null) },
+                            onClick = {
+                                menuOpen = false
+                                onSaveTemplate()
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("清空提示词", color = MaterialTheme.colorScheme.error) },
+                            leadingIcon = {
+                                Icon(
+                                    Icons.Outlined.Clear,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.error,
+                                )
+                            },
+                            onClick = {
+                                menuOpen = false
+                                onClearPrompt()
+                            },
+                        )
+                    }
                 }
             },
         )
-        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-            DropdownMenuItem(
-                text = { Text("随机种子并生成") },
-                leadingIcon = { Icon(Icons.Outlined.Shuffle, contentDescription = null) },
-                enabled = ready && !active,
-                onClick = {
-                    menuOpen = false
-                    vm.setSeedText(PromptBuilder.randomSeed().toString())
-                    generateNow()
-                },
-            )
-            DropdownMenuItem(
-                text = { Text("存为模板") },
-                leadingIcon = { Icon(Icons.Outlined.BookmarkAdd, contentDescription = null) },
-                onClick = {
-                    menuOpen = false
-                    onSaveTemplate()
-                },
-            )
-            DropdownMenuItem(
-                text = { Text("清空提示词", color = MaterialTheme.colorScheme.error) },
-                leadingIcon = {
-                    Icon(
-                        Icons.Outlined.Clear,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.error,
-                    )
-                },
-                onClick = {
-                    menuOpen = false
-                    onClearPrompt()
-                },
-            )
-        }
     }
 }
 
@@ -1666,13 +1678,15 @@ private fun SuccessCard(
     } else {
         1f
     }
+    // 参数与 seed 分两行：拼成一行时换行点正好落在「 · 」后面，
+    // 第一行会以孤立的分隔符结尾（视觉 QA P2-2 同类问题）。
     val meta = listOfNotNull(
         params?.steps?.takeIf { it > 0 }?.let { "${it}步" },
         params?.cfg?.takeIf { it > 0 }?.let { "CFG ${trimNum(it)}" },
         params?.sampler?.takeIf { it.isNotBlank() },
         params?.takeIf { it.width > 0 && it.height > 0 }?.let { "${it.width}×${it.height}" },
-        params?.seed?.takeIf { it > 0 }?.let { "seed $it" },
     ).joinToString(" · ")
+    val seedMeta = params?.seed?.takeIf { it > 0 }?.let { "seed $it" }
 
     ExpressiveCard(modifier = Modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1725,7 +1739,13 @@ private fun SuccessCard(
         }
         Spacer(Modifier.height(Spacing.sm))
         Row(verticalAlignment = Alignment.CenterVertically) {
-            MetaText(meta, Modifier.weight(1f))
+            Column(Modifier.weight(1f)) {
+                MetaText(meta)
+                if (seedMeta != null) {
+                    Spacer(Modifier.height(Spacing.xxs))
+                    MetaText(seedMeta)
+                }
+            }
             Spacer(Modifier.width(Spacing.sm))
             Text(
                 "点击看图",
@@ -1869,13 +1889,23 @@ private fun ConnectionErrorCard(
 @Composable
 private fun SaveTemplateDialog(onDismiss: () -> Unit, onSave: (String) -> Unit) {
     var name by remember { mutableStateOf("") }
+    val focusRequester = remember { FocusRequester() }
+    // 打开即聚焦名称输入框：省一次点按，键盘直接可用。
+    LaunchedEffect(Unit) {
+        delay(120)
+        runCatching { focusRequester.requestFocus() }
+    }
     AlertDialog(
         onDismissRequest = onDismiss,
+        // 对话框用低一层的 tonal 容器：AnimaTextField 是 surfaceContainerHigh，
+        // 默认两者同为 High，输入框在弹窗里会「隐身」（真机 QA 发现）。
+        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         title = { Text("存为模板") },
         text = {
             AnimaTextField(
                 value = name,
                 onValueChange = { name = it },
+                modifier = Modifier.focusRequester(focusRequester),
                 label = "模板名称",
                 placeholder = "例如：黄昏教室",
                 singleLine = true,
