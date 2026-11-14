@@ -1,0 +1,198 @@
+{
+  "version": 1,
+  "models": [
+    {
+      "id": "base",
+      "match": [
+        "anima-base-v1.0",
+        "anima-base"
+      ],
+      "display": "Anima Base v1.0",
+      "desc": "未精修底座，30-50 步 / CFG 4-5，必须加质量标签，画风上限最高",
+      "steps": 30,
+      "cfg": 4.5,
+      "sampler": "er_sde",
+      "scheduler": "simple",
+      "qualityPositive": "masterpiece, best quality",
+      "negativePreset": "base",
+      "sizes": [
+        [
+          1024,
+          1024
+        ],
+        [
+          832,
+          1216
+        ],
+        [
+          1216,
+          832
+        ]
+      ],
+      "recommended": true
+    },
+    {
+      "id": "aesthetic",
+      "match": [
+        "anima-aesthetic-v1.1",
+        "anima-aesthetic"
+      ],
+      "display": "Anima Aesthetic v1.1",
+      "desc": "高质量微调，20-30 步 / CFG 4-4.5，默认出图最好看；不要加质量标签、负向不用 score_*",
+      "steps": 30,
+      "cfg": 4.5,
+      "sampler": "er_sde",
+      "scheduler": "simple",
+      "qualityPositive": "",
+      "negativePreset": "aesthetic",
+      "sizes": [
+        [
+          1024,
+          1024
+        ],
+        [
+          832,
+          1216
+        ],
+        [
+          1216,
+          832
+        ]
+      ]
+    },
+    {
+      "id": "turbo",
+      "match": [
+        "anima-turbo-v1.1",
+        "anima-turbo"
+      ],
+      "display": "Anima Turbo v1.1",
+      "desc": "步数蒸馏版，12 步 / CFG 1.0，速度最快；CFG 1 下负向提示词无效",
+      "steps": 12,
+      "cfg": 1.0,
+      "sampler": "euler",
+      "scheduler": "simple",
+      "qualityPositive": "masterpiece, best quality",
+      "negativePreset": "turbo",
+      "sizes": [
+        [
+          1024,
+          1024
+        ],
+        [
+          832,
+          1216
+        ],
+        [
+          1216,
+          832
+        ]
+      ]
+    },
+    {
+      "id": "kirazuri",
+      "match": [
+        "kirazuri",
+        "Kirazuri"
+      ],
+      "display": "Anima Kirazuri v4",
+      "desc": "全量重训（截止 2026-06），30-50 步 / CFG 4-5（官方例图 4.0），新番角色首选；可加 very aesthetic；挂 Turbo LoRA 时 12 步 / CFG 1",
+      "steps": 30,
+      "cfg": 4.0,
+      "sampler": "er_sde",
+      "scheduler": "simple",
+      "qualityPositive": "very aesthetic, masterpiece, best quality",
+      "negativePreset": "base",
+      "sizes": [
+        [
+          1024,
+          1024
+        ],
+        [
+          832,
+          1216
+        ],
+        [
+          1216,
+          832
+        ]
+      ]
+    },
+    {
+      "id": "silvermoon",
+      "match": [
+        "Silvermoon",
+        "silvermoon"
+      ],
+      "display": "SilvermoonMix 2.9B",
+      "desc": "2.9B 系微调，手稳、多人强、不压画师 tag；28-50 步 / CFG 3-3.5",
+      "steps": 30,
+      "cfg": 3.5,
+      "sampler": "euler",
+      "scheduler": "simple",
+      "qualityPositive": "masterpiece, best quality",
+      "negativePreset": "base",
+      "sizes": [
+        [
+          1024,
+          1024
+        ],
+        [
+          832,
+          1216
+        ],
+        [
+          1216,
+          832
+        ]
+      ]
+    },
+    {
+      "id": "2.9b",
+      "match": [
+        "2.9B",
+        "2.9b"
+      ],
+      "display": "Anima 2.9B",
+      "desc": "2.9B 扩层版（28 层扩到 40 层，截止 2026-07），28-50 步 / CFG 3-3.5；CFG 照搬 4.5 会过曝，官方例用 euler + sgm-uniform",
+      "steps": 30,
+      "cfg": 3.5,
+      "sampler": "euler",
+      "scheduler": "simple",
+      "qualityPositive": "masterpiece, best quality",
+      "negativePreset": "base",
+      "sizes": [
+        [
+          1024,
+          1024
+        ],
+        [
+          832,
+          1216
+        ],
+        [
+          1216,
+          832
+        ]
+      ]
+    },
+    {
+      "id": "generic",
+      "match": [],
+      "display": "通用 / 未知模型",
+      "desc": "未识别模型，用保守参数（match 全部未命中时自动兜底）",
+      "steps": 30,
+      "cfg": 4.5,
+      "sampler": "er_sde",
+      "scheduler": "simple",
+      "qualityPositive": "",
+      "negativePreset": "generic",
+      "sizes": [
+        [
+          1024,
+          1024
+        ]
+      ]
+    }
+  ]
+}

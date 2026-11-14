@@ -1,0 +1,1273 @@
+{
+  "version": 1,
+  "categories": [
+    {
+      "id": "hair",
+      "zh": "头发",
+      "tags": [
+        {
+          "en": "long hair",
+          "zh": "长发"
+        },
+        {
+          "en": "short hair",
+          "zh": "短发"
+        },
+        {
+          "en": "medium hair",
+          "zh": "中长发"
+        },
+        {
+          "en": "very long hair",
+          "zh": "超长发"
+        },
+        {
+          "en": "twintails",
+          "zh": "双马尾"
+        },
+        {
+          "en": "ponytail",
+          "zh": "马尾辫"
+        },
+        {
+          "en": "high ponytail",
+          "zh": "高马尾"
+        },
+        {
+          "en": "side ponytail",
+          "zh": "侧马尾"
+        },
+        {
+          "en": "twin braids",
+          "zh": "双麻花辫"
+        },
+        {
+          "en": "braid",
+          "zh": "麻花辫"
+        },
+        {
+          "en": "single braid",
+          "zh": "单侧麻花辫"
+        },
+        {
+          "en": "bob cut",
+          "zh": "波波头"
+        },
+        {
+          "en": "hime cut",
+          "zh": "公主切"
+        },
+        {
+          "en": "ahoge",
+          "zh": "呆毛"
+        },
+        {
+          "en": "bangs",
+          "zh": "刘海"
+        },
+        {
+          "en": "blunt bangs",
+          "zh": "齐刘海"
+        },
+        {
+          "en": "swept bangs",
+          "zh": "斜刘海"
+        },
+        {
+          "en": "hair between eyes",
+          "zh": "眼间碎发"
+        },
+        {
+          "en": "sidelocks",
+          "zh": "鬓发"
+        },
+        {
+          "en": "hair ribbon",
+          "zh": "发带"
+        },
+        {
+          "en": "hairband",
+          "zh": "发箍"
+        },
+        {
+          "en": "hair ornament",
+          "zh": "发饰"
+        },
+        {
+          "en": "hairclip",
+          "zh": "发夹"
+        },
+        {
+          "en": "silver hair",
+          "zh": "银发"
+        },
+        {
+          "en": "blonde hair",
+          "zh": "金发"
+        },
+        {
+          "en": "black hair",
+          "zh": "黑发"
+        },
+        {
+          "en": "brown hair",
+          "zh": "棕发"
+        },
+        {
+          "en": "white hair",
+          "zh": "白发"
+        },
+        {
+          "en": "pink hair",
+          "zh": "粉发"
+        },
+        {
+          "en": "blue hair",
+          "zh": "蓝发"
+        },
+        {
+          "en": "red hair",
+          "zh": "红发"
+        },
+        {
+          "en": "purple hair",
+          "zh": "紫发"
+        },
+        {
+          "en": "gradient hair",
+          "zh": "渐变发色"
+        },
+        {
+          "en": "multicolored hair",
+          "zh": "多彩发色"
+        },
+        {
+          "en": "wavy hair",
+          "zh": "波浪卷发"
+        },
+        {
+          "en": "drill hair",
+          "zh": "卷钻发"
+        }
+      ]
+    },
+    {
+      "id": "eyes",
+      "zh": "眼睛表情",
+      "tags": [
+        {
+          "en": "blue eyes",
+          "zh": "蓝眼睛"
+        },
+        {
+          "en": "red eyes",
+          "zh": "红眼睛"
+        },
+        {
+          "en": "green eyes",
+          "zh": "绿眼睛"
+        },
+        {
+          "en": "purple eyes",
+          "zh": "紫眼睛"
+        },
+        {
+          "en": "yellow eyes",
+          "zh": "黄眼睛"
+        },
+        {
+          "en": "brown eyes",
+          "zh": "棕眼睛"
+        },
+        {
+          "en": "grey eyes",
+          "zh": "灰眼睛"
+        },
+        {
+          "en": "heterochromia",
+          "zh": "异色瞳"
+        },
+        {
+          "en": "glasses",
+          "zh": "眼镜"
+        },
+        {
+          "en": "sunglasses",
+          "zh": "墨镜"
+        },
+        {
+          "en": "eyepatch",
+          "zh": "眼罩"
+        },
+        {
+          "en": "closed eyes",
+          "zh": "闭眼"
+        },
+        {
+          "en": "half-closed eyes",
+          "zh": "半睁眼"
+        },
+        {
+          "en": "one eye closed",
+          "zh": "单眼闭合"
+        },
+        {
+          "en": "wink",
+          "zh": "眨眼"
+        },
+        {
+          "en": "sparkling eyes",
+          "zh": "闪亮眼眸"
+        },
+        {
+          "en": "tearful eyes",
+          "zh": "含泪眼眸"
+        },
+        {
+          "en": "blush",
+          "zh": "脸红"
+        },
+        {
+          "en": "smile",
+          "zh": "微笑"
+        },
+        {
+          "en": "grin",
+          "zh": "咧嘴笑"
+        },
+        {
+          "en": "open mouth",
+          "zh": "张嘴"
+        },
+        {
+          "en": "closed mouth",
+          "zh": "闭嘴"
+        },
+        {
+          "en": "pout",
+          "zh": "嘟嘴"
+        },
+        {
+          "en": "frown",
+          "zh": "皱眉"
+        },
+        {
+          "en": "expressionless",
+          "zh": "面无表情"
+        },
+        {
+          "en": "angry",
+          "zh": "生气"
+        },
+        {
+          "en": "surprised",
+          "zh": "惊讶"
+        },
+        {
+          "en": "crying",
+          "zh": "哭泣"
+        },
+        {
+          "en": "tears",
+          "zh": "眼泪"
+        },
+        {
+          "en": "looking at viewer",
+          "zh": "看向镜头"
+        },
+        {
+          "en": "looking away",
+          "zh": "移开视线"
+        },
+        {
+          "en": "looking back",
+          "zh": "回头看"
+        },
+        {
+          "en": "looking up",
+          "zh": "向上看"
+        },
+        {
+          "en": "looking down",
+          "zh": "向下看"
+        }
+      ]
+    },
+    {
+      "id": "clothing",
+      "zh": "服装",
+      "tags": [
+        {
+          "en": "school uniform",
+          "zh": "校服"
+        },
+        {
+          "en": "serafuku",
+          "zh": "水手服"
+        },
+        {
+          "en": "sailor collar",
+          "zh": "水手领"
+        },
+        {
+          "en": "blazer",
+          "zh": "西装外套"
+        },
+        {
+          "en": "white shirt",
+          "zh": "白衬衫"
+        },
+        {
+          "en": "pleated skirt",
+          "zh": "百褶裙"
+        },
+        {
+          "en": "skirt",
+          "zh": "裙子"
+        },
+        {
+          "en": "shorts",
+          "zh": "短裤"
+        },
+        {
+          "en": "dress",
+          "zh": "连衣裙"
+        },
+        {
+          "en": "white dress",
+          "zh": "白裙"
+        },
+        {
+          "en": "sundress",
+          "zh": "吊带连衣裙"
+        },
+        {
+          "en": "hoodie",
+          "zh": "连帽衫"
+        },
+        {
+          "en": "jacket",
+          "zh": "夹克"
+        },
+        {
+          "en": "cardigan",
+          "zh": "开衫"
+        },
+        {
+          "en": "sweater",
+          "zh": "毛衣"
+        },
+        {
+          "en": "turtleneck",
+          "zh": "高领毛衣"
+        },
+        {
+          "en": "coat",
+          "zh": "大衣"
+        },
+        {
+          "en": "kimono",
+          "zh": "和服"
+        },
+        {
+          "en": "yukata",
+          "zh": "浴衣"
+        },
+        {
+          "en": "hanfu",
+          "zh": "汉服"
+        },
+        {
+          "en": "cheongsam",
+          "zh": "旗袍"
+        },
+        {
+          "en": "maid",
+          "zh": "女仆装"
+        },
+        {
+          "en": "maid headdress",
+          "zh": "女仆头饰"
+        },
+        {
+          "en": "apron",
+          "zh": "围裙"
+        },
+        {
+          "en": "necktie",
+          "zh": "领带"
+        },
+        {
+          "en": "neckerchief",
+          "zh": "领巾"
+        },
+        {
+          "en": "scarf",
+          "zh": "围巾"
+        },
+        {
+          "en": "ribbon",
+          "zh": "蝴蝶结"
+        },
+        {
+          "en": "gloves",
+          "zh": "手套"
+        },
+        {
+          "en": "thighhighs",
+          "zh": "过膝袜"
+        },
+        {
+          "en": "socks",
+          "zh": "袜子"
+        },
+        {
+          "en": "boots",
+          "zh": "靴子"
+        },
+        {
+          "en": "high heels",
+          "zh": "高跟鞋"
+        },
+        {
+          "en": "swimsuit",
+          "zh": "泳装"
+        },
+        {
+          "en": "one-piece swimsuit",
+          "zh": "连体泳装"
+        },
+        {
+          "en": "bikini",
+          "zh": "比基尼"
+        },
+        {
+          "en": "lab coat",
+          "zh": "白大褂"
+        },
+        {
+          "en": "suit",
+          "zh": "西装"
+        }
+      ]
+    },
+    {
+      "id": "pose",
+      "zh": "动作姿势",
+      "tags": [
+        {
+          "en": "standing",
+          "zh": "站立"
+        },
+        {
+          "en": "sitting",
+          "zh": "坐姿"
+        },
+        {
+          "en": "walking",
+          "zh": "行走"
+        },
+        {
+          "en": "running",
+          "zh": "奔跑"
+        },
+        {
+          "en": "jumping",
+          "zh": "跳跃"
+        },
+        {
+          "en": "lying on back",
+          "zh": "仰卧"
+        },
+        {
+          "en": "lying on stomach",
+          "zh": "俯卧"
+        },
+        {
+          "en": "leaning forward",
+          "zh": "身体前倾"
+        },
+        {
+          "en": "leaning back",
+          "zh": "身体后仰"
+        },
+        {
+          "en": "kneeling",
+          "zh": "跪姿"
+        },
+        {
+          "en": "squatting",
+          "zh": "蹲姿"
+        },
+        {
+          "en": "arms up",
+          "zh": "举手"
+        },
+        {
+          "en": "arms behind back",
+          "zh": "双手背后"
+        },
+        {
+          "en": "crossed arms",
+          "zh": "抱臂"
+        },
+        {
+          "en": "hands on hips",
+          "zh": "叉腰"
+        },
+        {
+          "en": "hands in pockets",
+          "zh": "手插口袋"
+        },
+        {
+          "en": "waving",
+          "zh": "挥手"
+        },
+        {
+          "en": "pointing",
+          "zh": "手指指向"
+        },
+        {
+          "en": "reaching out",
+          "zh": "伸出手"
+        },
+        {
+          "en": "stretching",
+          "zh": "伸展身体"
+        },
+        {
+          "en": "yawning",
+          "zh": "打哈欠"
+        },
+        {
+          "en": "sleeping",
+          "zh": "睡觉"
+        },
+        {
+          "en": "reading",
+          "zh": "阅读"
+        },
+        {
+          "en": "eating",
+          "zh": "吃东西"
+        },
+        {
+          "en": "drinking",
+          "zh": "喝水"
+        },
+        {
+          "en": "dancing",
+          "zh": "跳舞"
+        },
+        {
+          "en": "singing",
+          "zh": "唱歌"
+        },
+        {
+          "en": "holding umbrella",
+          "zh": "撑伞"
+        },
+        {
+          "en": "holding book",
+          "zh": "拿书"
+        },
+        {
+          "en": "holding cup",
+          "zh": "拿杯子"
+        },
+        {
+          "en": "holding phone",
+          "zh": "拿手机"
+        },
+        {
+          "en": "holding bag",
+          "zh": "提包"
+        },
+        {
+          "en": "holding sword",
+          "zh": "持剑"
+        },
+        {
+          "en": "holding bouquet",
+          "zh": "捧花"
+        },
+        {
+          "en": "holding hands",
+          "zh": "牵手"
+        },
+        {
+          "en": "hugging",
+          "zh": "拥抱"
+        },
+        {
+          "en": "headpat",
+          "zh": "摸头"
+        },
+        {
+          "en": "piggyback",
+          "zh": "背人"
+        }
+      ]
+    },
+    {
+      "id": "framing",
+      "zh": "构图镜头",
+      "tags": [
+        {
+          "en": "portrait",
+          "zh": "肖像"
+        },
+        {
+          "en": "upper body",
+          "zh": "上半身"
+        },
+        {
+          "en": "cowboy shot",
+          "zh": "牛仔镜头（大腿以上）"
+        },
+        {
+          "en": "full body",
+          "zh": "全身"
+        },
+        {
+          "en": "close-up",
+          "zh": "特写"
+        },
+        {
+          "en": "wide shot",
+          "zh": "远景"
+        },
+        {
+          "en": "from above",
+          "zh": "俯视"
+        },
+        {
+          "en": "from below",
+          "zh": "仰视"
+        },
+        {
+          "en": "from behind",
+          "zh": "背面"
+        },
+        {
+          "en": "from side",
+          "zh": "侧面"
+        },
+        {
+          "en": "side view",
+          "zh": "侧视角"
+        },
+        {
+          "en": "three-quarter view",
+          "zh": "四分之三视角"
+        },
+        {
+          "en": "back view",
+          "zh": "背影"
+        },
+        {
+          "en": "front view",
+          "zh": "正面"
+        },
+        {
+          "en": "profile",
+          "zh": "侧脸"
+        },
+        {
+          "en": "dutch angle",
+          "zh": "倾斜构图"
+        },
+        {
+          "en": "foreshortening",
+          "zh": "透视缩短"
+        },
+        {
+          "en": "perspective",
+          "zh": "透视"
+        },
+        {
+          "en": "character sheet",
+          "zh": "角色设定图"
+        },
+        {
+          "en": "multiple views",
+          "zh": "多视角"
+        }
+      ]
+    },
+    {
+      "id": "scene",
+      "zh": "场景",
+      "tags": [
+        {
+          "en": "classroom",
+          "zh": "教室"
+        },
+        {
+          "en": "school hallway",
+          "zh": "学校走廊"
+        },
+        {
+          "en": "music room",
+          "zh": "音乐室"
+        },
+        {
+          "en": "clubroom",
+          "zh": "社团活动室"
+        },
+        {
+          "en": "library",
+          "zh": "图书馆"
+        },
+        {
+          "en": "bedroom",
+          "zh": "卧室"
+        },
+        {
+          "en": "kitchen",
+          "zh": "厨房"
+        },
+        {
+          "en": "cafe",
+          "zh": "咖啡厅"
+        },
+        {
+          "en": "park",
+          "zh": "公园"
+        },
+        {
+          "en": "garden",
+          "zh": "花园"
+        },
+        {
+          "en": "shrine",
+          "zh": "神社"
+        },
+        {
+          "en": "ruins",
+          "zh": "废墟"
+        },
+        {
+          "en": "mountains",
+          "zh": "山脉"
+        },
+        {
+          "en": "ocean",
+          "zh": "海洋"
+        },
+        {
+          "en": "lake",
+          "zh": "湖泊"
+        },
+        {
+          "en": "river",
+          "zh": "河流"
+        },
+        {
+          "en": "waterfall",
+          "zh": "瀑布"
+        },
+        {
+          "en": "snow",
+          "zh": "雪景"
+        },
+        {
+          "en": "field",
+          "zh": "田野"
+        },
+        {
+          "en": "city",
+          "zh": "城市"
+        },
+        {
+          "en": "street",
+          "zh": "街道"
+        },
+        {
+          "en": "alley",
+          "zh": "小巷"
+        },
+        {
+          "en": "rooftop",
+          "zh": "屋顶"
+        },
+        {
+          "en": "train station",
+          "zh": "车站"
+        },
+        {
+          "en": "space",
+          "zh": "太空"
+        },
+        {
+          "en": "window",
+          "zh": "窗户"
+        },
+        {
+          "en": "indoors",
+          "zh": "室内"
+        },
+        {
+          "en": "outdoors",
+          "zh": "室外"
+        },
+        {
+          "en": "underwater",
+          "zh": "水下"
+        },
+        {
+          "en": "bamboo forest",
+          "zh": "竹林"
+        },
+        {
+          "en": "cherry blossoms",
+          "zh": "樱花"
+        },
+        {
+          "en": "night sky",
+          "zh": "夜空"
+        },
+        {
+          "en": "starry sky",
+          "zh": "星空"
+        },
+        {
+          "en": "blue sky",
+          "zh": "蓝天"
+        },
+        {
+          "en": "flower field",
+          "zh": "花田"
+        },
+        {
+          "en": "beach",
+          "zh": "海滩"
+        },
+        {
+          "en": "forest",
+          "zh": "森林"
+        },
+        {
+          "en": "white background",
+          "zh": "白底"
+        },
+        {
+          "en": "simple background",
+          "zh": "简单背景"
+        }
+      ]
+    },
+    {
+      "id": "lighting",
+      "zh": "光照氛围",
+      "tags": [
+        {
+          "en": "sunlight",
+          "zh": "阳光"
+        },
+        {
+          "en": "sunset",
+          "zh": "日落"
+        },
+        {
+          "en": "sunrise",
+          "zh": "日出"
+        },
+        {
+          "en": "golden hour",
+          "zh": "黄金时刻"
+        },
+        {
+          "en": "twilight",
+          "zh": "暮色"
+        },
+        {
+          "en": "night",
+          "zh": "夜晚"
+        },
+        {
+          "en": "moonlight",
+          "zh": "月光"
+        },
+        {
+          "en": "backlighting",
+          "zh": "逆光"
+        },
+        {
+          "en": "rim light",
+          "zh": "轮廓光"
+        },
+        {
+          "en": "cinematic lighting",
+          "zh": "电影感光照"
+        },
+        {
+          "en": "soft lighting",
+          "zh": "柔光"
+        },
+        {
+          "en": "dim lighting",
+          "zh": "昏暗光线"
+        },
+        {
+          "en": "warm lighting",
+          "zh": "暖光"
+        },
+        {
+          "en": "cold lighting",
+          "zh": "冷光"
+        },
+        {
+          "en": "neon lights",
+          "zh": "霓虹灯"
+        },
+        {
+          "en": "light rays",
+          "zh": "光束"
+        },
+        {
+          "en": "dappled sunlight",
+          "zh": "斑驳阳光"
+        },
+        {
+          "en": "bokeh",
+          "zh": "焦外光斑"
+        },
+        {
+          "en": "depth of field",
+          "zh": "景深"
+        },
+        {
+          "en": "blurry background",
+          "zh": "背景虚化"
+        },
+        {
+          "en": "lens flare",
+          "zh": "镜头光晕"
+        },
+        {
+          "en": "motion blur",
+          "zh": "动态模糊"
+        },
+        {
+          "en": "dust particles",
+          "zh": "尘埃颗粒"
+        },
+        {
+          "en": "fog",
+          "zh": "雾"
+        },
+        {
+          "en": "mist",
+          "zh": "薄雾"
+        },
+        {
+          "en": "caustics",
+          "zh": "焦散光"
+        },
+        {
+          "en": "sparkle",
+          "zh": "闪光"
+        }
+      ]
+    },
+    {
+      "id": "meta",
+      "zh": "质量元数据",
+      "tags": [
+        {
+          "en": "masterpiece",
+          "zh": "杰作"
+        },
+        {
+          "en": "best quality",
+          "zh": "最佳质量"
+        },
+        {
+          "en": "highres",
+          "zh": "高分辨率"
+        },
+        {
+          "en": "absurdres",
+          "zh": "超高分辨率"
+        },
+        {
+          "en": "very aesthetic",
+          "zh": "极佳美学（Kirazuri）"
+        },
+        {
+          "en": "anime screenshot",
+          "zh": "动画截图"
+        },
+        {
+          "en": "official art",
+          "zh": "官方图"
+        },
+        {
+          "en": "light novel illustration",
+          "zh": "轻小说插画"
+        },
+        {
+          "en": "digital painting",
+          "zh": "数字绘画"
+        },
+        {
+          "en": "painterly",
+          "zh": "厚涂风"
+        },
+        {
+          "en": "concept art",
+          "zh": "概念艺术"
+        },
+        {
+          "en": "illustration",
+          "zh": "插画"
+        },
+        {
+          "en": "sketch",
+          "zh": "草图"
+        },
+        {
+          "en": "lineart",
+          "zh": "线稿"
+        },
+        {
+          "en": "watercolor",
+          "zh": "水彩"
+        },
+        {
+          "en": "monochrome",
+          "zh": "单色"
+        },
+        {
+          "en": "flat color",
+          "zh": "平涂"
+        },
+        {
+          "en": "newest",
+          "zh": "最新年代"
+        },
+        {
+          "en": "recent",
+          "zh": "近期年代"
+        },
+        {
+          "en": "mid",
+          "zh": "中期年代"
+        },
+        {
+          "en": "early",
+          "zh": "早期年代"
+        },
+        {
+          "en": "old",
+          "zh": "古早年代"
+        },
+        {
+          "en": "year 2025",
+          "zh": "2025 年"
+        },
+        {
+          "en": "year 2020",
+          "zh": "2020 年"
+        },
+        {
+          "en": "year 2015",
+          "zh": "2015 年"
+        }
+      ]
+    },
+    {
+      "id": "safety",
+      "zh": "安全分级",
+      "tags": [
+        {
+          "en": "safe",
+          "zh": "安全（全年龄）"
+        },
+        {
+          "en": "sensitive",
+          "zh": "敏感"
+        },
+        {
+          "en": "nsfw",
+          "zh": "成人向（NSFW）"
+        },
+        {
+          "en": "explicit",
+          "zh": "露骨（R-18）"
+        }
+      ]
+    },
+    {
+      "id": "artist",
+      "zh": "画师",
+      "tags": [
+        {
+          "en": "@hiten \\(hitenkei\\)",
+          "zh": "画师 Hiten（HitenKei）",
+          "artist": true
+        },
+        {
+          "en": "@kantoku",
+          "zh": "画师 Kantoku",
+          "artist": true
+        },
+        {
+          "en": "@yoneyama mai",
+          "zh": "画师 米山舞",
+          "artist": true
+        },
+        {
+          "en": "@mika pikazo",
+          "zh": "画师 Mika Pikazo",
+          "artist": true
+        },
+        {
+          "en": "@wlop",
+          "zh": "画师 WLOP",
+          "artist": true
+        },
+        {
+          "en": "@redjuice",
+          "zh": "画师 redjuice",
+          "artist": true
+        },
+        {
+          "en": "@huke",
+          "zh": "画师 huke",
+          "artist": true
+        },
+        {
+          "en": "@kishida mel",
+          "zh": "画师 岸田梅尔",
+          "artist": true
+        },
+        {
+          "en": "@misaki kurehito",
+          "zh": "画师 深崎暮人",
+          "artist": true
+        },
+        {
+          "en": "@tsunako",
+          "zh": "画师 つなこ",
+          "artist": true
+        },
+        {
+          "en": "@hisasi",
+          "zh": "画师 hisasi",
+          "artist": true
+        },
+        {
+          "en": "@loundraw",
+          "zh": "画师 loundraw",
+          "artist": true
+        },
+        {
+          "en": "@fuzichoco",
+          "zh": "画师 藤ちょこ",
+          "artist": true
+        },
+        {
+          "en": "@wada arco",
+          "zh": "画师 和田アーコ",
+          "artist": true
+        },
+        {
+          "en": "@bunbun",
+          "zh": "画师 BUNBUN",
+          "artist": true
+        },
+        {
+          "en": "@abec",
+          "zh": "画师 abec",
+          "artist": true
+        },
+        {
+          "en": "@shirabi",
+          "zh": "画师 しらび",
+          "artist": true
+        },
+        {
+          "en": "@krenz cushart",
+          "zh": "画师 Krenz Cushart",
+          "artist": true
+        },
+        {
+          "en": "@shigure ui",
+          "zh": "画师 しぐれうい",
+          "artist": true
+        },
+        {
+          "en": "@nishiya futoshi",
+          "zh": "画师 西屋太志",
+          "artist": true
+        },
+        {
+          "en": "@horiguchi yukiko",
+          "zh": "画师 堀口悠紀子",
+          "artist": true
+        },
+        {
+          "en": "@as109",
+          "zh": "画师 AS109",
+          "artist": true
+        }
+      ]
+    },
+    {
+      "id": "multi",
+      "zh": "多人",
+      "tags": [
+        {
+          "en": "1girl",
+          "zh": "一个女孩"
+        },
+        {
+          "en": "1boy",
+          "zh": "一个男孩"
+        },
+        {
+          "en": "2girls",
+          "zh": "两个女孩"
+        },
+        {
+          "en": "2boys",
+          "zh": "两个男孩"
+        },
+        {
+          "en": "multiple girls",
+          "zh": "多个女孩"
+        },
+        {
+          "en": "multiple boys",
+          "zh": "多个男孩"
+        },
+        {
+          "en": "solo",
+          "zh": "单人（画面仅一人）"
+        },
+        {
+          "en": "1other",
+          "zh": "单个非人类 / 性别不明"
+        },
+        {
+          "en": "no humans",
+          "zh": "无人物"
+        },
+        {
+          "en": "animal focus",
+          "zh": "以动物为主体"
+        },
+        {
+          "en": "group",
+          "zh": "群像"
+        },
+        {
+          "en": "couple",
+          "zh": "情侣双人"
+        }
+      ]
+    }
+  ]
+}

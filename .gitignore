@@ -1,0 +1,14 @@
+# Android
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+*.apk
+*.aab
+# Python
+__pycache__/
+*.pyc
+# 本地结果 / 日志
+outputs/
+*.log
+colab/.ipynb_checkpoints/

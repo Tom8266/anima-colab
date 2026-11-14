@@ -1,0 +1,241 @@
+{
+  "version": 1,
+  "templates": [
+    {
+      "id": "standard-single",
+      "name": "标准单人",
+      "model": "base",
+      "prompt": "masterpiece, best quality, safe, 1girl, solo, long hair, brown eyes, light smile, looking at viewer, upper body, school uniform, classroom, soft lighting",
+      "negative": "worst quality, low quality, blurry, jpeg artifacts, bad hands, extra fingers, extra limbs, overexposed, blown out highlights, bloom, text, watermark, signature, lettering, score_1, score_2, score_3",
+      "steps": 30,
+      "cfg": 4.5,
+      "size": [
+        832,
+        1216
+      ],
+      "note": "最稳的入门模板：质量前缀 + 人数 + 景别 + 场景 + 光线；按「质量/安全→人数→角色→@画师→普通标签」追加，总数不超过约 40 个"
+    },
+    {
+      "id": "tachie-white",
+      "name": "白底全身立绘",
+      "model": "base",
+      "prompt": "safe, 1girl, solo, (@hiten \\(hitenkei\\):1.5)",
+      "negative": "worst quality, low quality, blurry, jpeg artifacts, bad hands, extra fingers, extra limbs, overexposed, blown out highlights, bloom, text, watermark, signature, lettering, score_1, score_2, score_3",
+      "steps": 30,
+      "cfg": 4.5,
+      "size": [
+        1080,
+        2400
+      ],
+      "note": "实测 1080x2400 长条画布会触发立绘模式（1080 非 64 倍数也能出干净白底）；构图由画师 tag 自带，prompt 极简即可"
+    },
+    {
+      "id": "duo-horizontal",
+      "name": "双人横构图",
+      "model": "base",
+      "prompt": "masterpiece, best quality, safe, 2girls, cowboy shot, side view, park, sunset, BREAK 1girl, long black hair, blue eyes, white dress, hugging, closed eyes, BREAK 1girl, short blonde hair, red eyes, school uniform, hugging, smile",
+      "negative": "worst quality, low quality, blurry, jpeg artifacts, bad hands, extra fingers, extra limbs, overexposed, blown out highlights, bloom, text, watermark, signature, lettering, score_1, score_2, score_3, fused bodies, bad anatomy, multiple views",
+      "steps": 30,
+      "cfg": 4.5,
+      "size": [
+        1216,
+        832
+      ],
+      "note": "多人必须 BREAK 分块 + 明确动作 + 横构图；避免两张正面大脸，side view + closed eyes 成功率最高"
+    },
+    {
+      "id": "artist-hiten",
+      "name": "画师风格复刻 @hiten",
+      "model": "base",
+      "prompt": "masterpiece, best quality, safe, 1girl, solo, (@hiten \\(hitenkei\\):1.5), portrait, looking at viewer, soft diffused lighting, shallow depth of field, white dress, flower field",
+      "negative": "worst quality, low quality, blurry, jpeg artifacts, bad hands, extra fingers, extra limbs, overexposed, blown out highlights, bloom, text, watermark, signature, lettering, score_1, score_2, score_3",
+      "steps": 30,
+      "cfg": 4.5,
+      "size": [
+        832,
+        1216
+      ],
+      "note": "画师 tag 权重给 1.3-1.6；任何 LoRA 都会压制画师 tag，复刻风格时把 LoRA 静音"
+    },
+    {
+      "id": "light-novel",
+      "name": "轻小说插画",
+      "model": "aesthetic",
+      "prompt": "safe, 1girl, solo, portrait, light novel illustration, soft diffused lighting, shallow depth of field, looking at viewer, white dress, flower field",
+      "negative": "worst quality, low quality, blurry, jpeg artifacts, bad hands, extra fingers, extra limbs, overexposed, blown out highlights, bloom, text, watermark, signature, lettering",
+      "steps": 30,
+      "cfg": 4.5,
+      "size": [
+        832,
+        1216
+      ],
+      "note": "aesthetic 不要写 masterpiece/best quality（写了会油腻），负向不要 score_*；柔光 + 浅景深是轻小说插画感的关键"
+    },
+    {
+      "id": "landscape",
+      "name": "纯风景无人物",
+      "model": "base",
+      "prompt": "masterpiece, best quality, safe, no humans, landscape, mountains, lake, forest, blue sky, clouds, sunlight, reflection",
+      "negative": "worst quality, low quality, blurry, jpeg artifacts, bad hands, extra fingers, extra limbs, overexposed, blown out highlights, bloom, text, watermark, signature, lettering, score_1, score_2, score_3",
+      "steps": 30,
+      "cfg": 4.5,
+      "size": [
+        1216,
+        832
+      ],
+      "note": "纯风景必须写 no humans；用具体场所和光线标签，不要写 beautiful / atmospheric 这类空词"
+    },
+    {
+      "id": "character-chitanda",
+      "name": "角色复刻：千反田爱瑠",
+      "model": "aesthetic",
+      "prompt": "safe, 1girl, solo, chitanda eru, hyouka, @nishiya futoshi, kyoto animation, year 2012, anime screenshot, official art, black hair, long hair, blunt bangs, purple eyes, kamiyama high school uniform, white shirt, sailor collar, red neckerchief, classic literature club room, bookshelves, old wooden desk, warm afternoon light, leaning forward, hands on desk, curious expression, sparkling eyes, looking at viewer, medium shot",
+      "negative": "worst quality, low quality, blurry, jpeg artifacts, bad hands, extra fingers, extra limbs, overexposed, blown out highlights, bloom, text, watermark, signature, lettering",
+      "steps": 32,
+      "cfg": 4.0,
+      "size": [
+        832,
+        1216
+      ],
+      "note": "训练集内的角色只需「角色 + 作品 + 画师/媒介」标签，不要重复描述外貌；加标志性场景/道具更像（千反田 = 古典部活动室 + 好奇前倾）"
+    },
+    {
+      "id": "neon-night",
+      "name": "夜景霓虹",
+      "model": "base",
+      "prompt": "masterpiece, best quality, safe, 1girl, solo, city, street, neon lights, night, rain, from behind, looking back, upper body, jacket",
+      "negative": "worst quality, low quality, blurry, jpeg artifacts, bad hands, extra fingers, extra limbs, overexposed, blown out highlights, bloom, text, watermark, signature, lettering, score_1, score_2, score_3",
+      "steps": 30,
+      "cfg": 4.5,
+      "size": [
+        832,
+        1216
+      ],
+      "note": "霓虹用具体光源标签（neon lights + night）而不是抽象氛围词；from behind + looking back 的回头背影最容易出氛围"
+    },
+    {
+      "id": "classroom-daily",
+      "name": "日常教室",
+      "model": "base",
+      "prompt": "masterpiece, best quality, safe, 1girl, solo, classroom, window, sunlight, school uniform, sitting, desk, looking at viewer, upper body, soft lighting",
+      "negative": "worst quality, low quality, blurry, jpeg artifacts, bad hands, extra fingers, extra limbs, overexposed, blown out highlights, bloom, text, watermark, signature, lettering, score_1, score_2, score_3",
+      "steps": 30,
+      "cfg": 4.5,
+      "size": [
+        832,
+        1216
+      ],
+      "note": "日常场景用具体场所（classroom）+ 窗光；坐姿 + 课桌能稳住肢体"
+    },
+    {
+      "id": "free",
+      "name": "自由创作",
+      "model": "base",
+      "prompt": "masterpiece, best quality, safe, 1girl, solo",
+      "negative": "worst quality, low quality, blurry, jpeg artifacts, bad hands, extra fingers, extra limbs, overexposed, blown out highlights, bloom, text, watermark, signature, lettering, score_1, score_2, score_3",
+      "steps": 30,
+      "cfg": 4.5,
+      "size": [
+        1024,
+        1024
+      ],
+      "note": "空白起点：按「质量/安全 → 人数 → 角色/作品 → @画师 → 普通标签」的顺序自由追加，总标签数不超过约 40 个"
+    }
+  ],
+  "snippets": [
+    {
+      "id": "quality-base",
+      "name": "base 质量前缀",
+      "text": "masterpiece, best quality",
+      "kind": "positive"
+    },
+    {
+      "id": "quality-turbo",
+      "name": "turbo 质量前缀（可加可不加）",
+      "text": "masterpiece, best quality",
+      "kind": "positive"
+    },
+    {
+      "id": "quality-aesthetic",
+      "name": "aesthetic 无需质量标签（留空）",
+      "text": "",
+      "kind": "positive"
+    },
+    {
+      "id": "subject-prefix",
+      "name": "安全 + 人数前缀",
+      "text": "safe, 1girl, solo",
+      "kind": "positive"
+    },
+    {
+      "id": "framing",
+      "name": "构图 / 景别片段",
+      "text": "upper body, looking at viewer, three-quarter view",
+      "kind": "positive"
+    },
+    {
+      "id": "scene-light",
+      "name": "场景 + 光线片段",
+      "text": "classroom, window, sunlight, soft lighting",
+      "kind": "positive"
+    },
+    {
+      "id": "artist-weight",
+      "name": "画师权重写法（1.3-1.6）",
+      "text": "(@hiten \\(hitenkei\\):1.5)",
+      "kind": "positive"
+    },
+    {
+      "id": "multi-break",
+      "name": "多人 BREAK 分块写法",
+      "text": "2girls, cowboy shot, BREAK 1girl, long hair, white dress, closed eyes, BREAK 1girl, short hair, school uniform, smile",
+      "kind": "positive"
+    },
+    {
+      "id": "character-prop",
+      "name": "角色标志性道具 / 场景",
+      "text": "classic literature club room, leaning forward, curious expression",
+      "kind": "positive"
+    },
+    {
+      "id": "natural-language",
+      "name": "自然语言补充片段（可混用）",
+      "text": "She looks peaceful and slightly sleepy.",
+      "kind": "positive"
+    },
+    {
+      "id": "negative-multi",
+      "name": "多人追加负向",
+      "text": "fused bodies, bad anatomy, multiple views",
+      "kind": "negative"
+    },
+    {
+      "id": "negative-overexpose",
+      "name": "换画风防过曝负向",
+      "text": "overexposed, harsh contrast, garish colors",
+      "kind": "negative"
+    }
+  ],
+  "negativePresets": [
+    {
+      "id": "base",
+      "name": "base 标准负向",
+      "text": "worst quality, low quality, blurry, jpeg artifacts, bad hands, extra fingers, extra limbs, overexposed, blown out highlights, bloom, text, watermark, signature, lettering, score_1, score_2, score_3"
+    },
+    {
+      "id": "aesthetic",
+      "name": "aesthetic 负向（不用 score_*）",
+      "text": "worst quality, low quality, blurry, jpeg artifacts, bad hands, extra fingers, extra limbs, overexposed, blown out highlights, bloom, text, watermark, signature, lettering"
+    },
+    {
+      "id": "turbo",
+      "name": "turbo 负向（CFG 1 无效，留空）",
+      "text": ""
+    },
+    {
+      "id": "generic",
+      "name": "通用负向",
+      "text": "worst quality, low quality, blurry, text, watermark, signature"
+    }
+  ]
+}
