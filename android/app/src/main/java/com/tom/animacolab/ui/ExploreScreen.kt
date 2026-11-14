@@ -372,8 +372,8 @@ private fun CategoryTabRow(
                 .weight(1f)
                 .drawWithContent {
                     drawContent()
-                    // 右边缘渐隐到页面背景：提示分类行可横向滚动，避免文字被硬裁切（视觉 QA P2-5）。
-                    // 宽度 = 行尾 edgePadding，滚到最后一个分类时不会压暗文字。
+                    // 左右边缘渐隐到页面背景：提示分类行可横向滚动，避免文字被硬裁切（视觉 QA P2-5）。
+                    // 宽度 = 行首/行尾 edgePadding：滚到两端时渐隐区正好落在 padding 上，不会压暗文字。
                     val fade = 20.dp.toPx()
                     drawRect(
                         brush = Brush.horizontalGradient(
@@ -382,6 +382,15 @@ private fun CategoryTabRow(
                             endX = size.width,
                         ),
                         topLeft = Offset(size.width - fade, 0f),
+                        size = Size(fade, size.height),
+                    )
+                    drawRect(
+                        brush = Brush.horizontalGradient(
+                            colors = listOf(background, Color.Transparent),
+                            startX = 0f,
+                            endX = fade,
+                        ),
+                        topLeft = Offset(0f, 0f),
                         size = Size(fade, size.height),
                     )
                 },

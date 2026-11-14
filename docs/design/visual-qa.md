@@ -171,16 +171,16 @@ scripts/device_shots.sh --install --phase full   # 构建 + 安装 + 15 张截�
 | `14-generate-result.png` | 生成成功结果卡 | 品牌深色 |
 | `15-dynamic-color.png` | 动态取色 Material You 对照 | 深色 + 动态色 |
 
-## 10. 追补修复（2026-11-14 晚，代码级）
+## 10. 追补修复（2026-11-14 晚，代码级 + 部分真机复验）
 
-> 本轮改动时真机未连接（`adb devices` 为空），以下修复只做了编译 + 单测验证，**没有重新截图**；
-> 上文截图仍是修复前的版本，结论与对比度数据继续有效。下次连机后执行
-> `scripts/device_shots.sh --install --phase full --dim` 复验并替换对应截图。
+> 这批改动最初在真机未连接时完成，只做了编译 + 单测验证。21:45 连机后用 light + 动态取色
+> 真机复验了 P2-3 / P2-5（通过 phone-mirror 插件的 `/phone-mirror/snapshot.jpg` 取画面），
+> 其余项仍是代码级验证；上文截图仍是修复前版本，深色截图集待重拍。
 
 | 条目 | 代码级状态 | 改动 |
 |---|---|---|
-| P2-3 Hero 装饰形状被状态 pill 压住 | ✅ 已改 | `SettingsScreen.kt`：移除右上角 112dp cookie，只保留右侧 sunny（alpha 0.18）；Hero 不再有装饰形状与任何前景控件相交 |
-| P2-5 速查分类 Tab 右边缘硬裁切 | ✅ 已改 | `ExploreScreen.kt` `CategoryTabRow`：Tab 行右边缘 20dp 渐隐到页面背景（宽度 = 行尾 `edgePadding`，滚到最后一个分类时不压暗文字）；计数 chip 保留 |
+| P2-3 Hero 装饰形状被状态 pill 压住 | ✅ 已改 · 真机复验 | `SettingsScreen.kt`：移除右上角 112dp cookie，只保留右侧 sunny（alpha 0.18）；Hero 不再有装饰形状与任何前景控件相交 |
+| P2-5 速查分类 Tab 硬裁切 | ✅ 已改 · 真机复验 | `ExploreScreen.kt` `CategoryTabRow`：Tab 行**左右**边缘各 20dp 渐隐到页面背景（宽度 = 行首/行尾 `edgePadding`，滚到两端时不压暗文字）；滚动时左缘字符渐隐、无硬切；计数 chip 保留 |
 | P2-6 空态装饰 blob 略碎 | ✅ 已改 | `Components.kt` `EmptyState`：3 个装饰减为 2 个（主 cookie + 右上 sunny），去掉左下 clover，边缘不再互相切割 |
 | §6.4 常驻进度条残余过渡态 | ✅ 已改 | `GenerateScreen.kt`：不再用 `atBottom`，改为按进度卡在滚动内容里的实际位置判断——卡片完全移出视口才显示常驻条，彻底消除「卡片可见 + 常驻条」同屏的中间态 |
 | 观察项：Viewer 单图顶部胶囊右侧留白 | ✅ 已改 | `ImageViewer.kt`：胶囊宽度随内容自适应（去掉 `fillMaxWidth`，标题 `weight(1f, fill = false)`），多图时页码仍靠右 |
@@ -193,6 +193,6 @@ scripts/device_shots.sh --install --phase full   # 构建 + 安装 + 15 张截�
 
 复验清单（连机后）：
 
-1. `--phase full` 重拍 01/05/07/10/11/04，重点看：Hero 右上角是否只剩一个形状且不压 pill；分类行右边缘是否自然渐隐；空态是否只剩两个形状；单图 Viewer 顶部胶囊是否变短。
+1. `--phase full` 重拍 01/05/07/10/11/04，重点看：Hero 右上角是否只剩一个形状且不压 pill（21:45 浅色已验）；分类行左右边缘是否自然渐隐（已验）；空态是否只剩两个形状；单图 Viewer 顶部胶囊是否变短。
 2. 生成中把列表停在「进度卡刚露头」的位置，确认只出现进度卡、没有常驻条（反向：停在顶部只出现常驻条）。
 3. 用 `scripts/device_shots.sh --dim` 跑完整轮，确认亮度恢复。
