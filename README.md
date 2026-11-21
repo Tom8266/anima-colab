@@ -143,3 +143,10 @@ colab stop -s anima        # 用完释放
 - T4 用 `--force-fp16`；TPU v5e1 用 `--bf16-unet` + 11 处 ComfyUI 设备补丁（实验档，固定 ComfyUI `v0.46.2`），首图需 JIT 编译约 1 分钟。
 - TPU 的 kernel 不能 import torch；App 每次启动都会新建 kernel，避免 libtpu 被占住。
 - Colab 平台禁止生成色情内容，只在云端跑正常内容。
+
+## 许可
+
+本项目代码以 **MIT** 许可发布，见 [LICENSE](LICENSE)。
+
+运行时会下载 ComfyUI（GPL-3.0）与 Anima 模型权重；它们的许可和使用条款以各自仓库 / 模型页为准。
+本仓库不包含这些第三方权重。
