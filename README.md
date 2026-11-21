@@ -17,6 +17,11 @@
                                                                   └───────────────┘
 ```
 
+## 下载 / 安装
+
+- **[最新 Release](https://github.com/Tom8266/anima-colab/releases/latest)**：提供 debug 签名的测试 APK，安装后即可连接 Colab。
+- 也可以本地构建：`scripts/build.sh` → `scripts/install.sh`（需要 JDK + Android SDK + adb）。
+
 ## 目录
 
 | 路径 | 内容 |
