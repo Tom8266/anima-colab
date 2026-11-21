@@ -100,6 +100,10 @@ CI 用什么，本地就用什么，避免"我这儿能过"：
 - `scripts/collab/doctor.sh` 全绿才算环境就绪；它会把缺的东西直接列出来。
 - Windows 上脚本按 **Git Bash** 写，不要在 PowerShell 里跑 `.sh`。
 - 网络不稳时优先用 **SSH remote**（`git@github.com:Tom8266/anima-colab.git`），比 HTTPS 稳。
+- 国内访问 `dl.google.com` 往往只有几十 KB/s：在 `.gradle-user-home/init.d/cn-mirrors.gradle`
+  挂一份镜像（本地文件，不提交），首次构建会快很多。
+- 报 `journal-1.lock 拒绝访问` 说明 IDE 的 Gradle 守护进程占着全局缓存锁；用
+  `scripts/build.sh`（会优先用项目内 `.gradle-user-home`）或临时关掉 IDE 的守护进程。
 - `android/local.properties` 是本机的（gitignore），不要提交。
 
 ## 6. GitHub 侧一次性配置（仓库管理员）
