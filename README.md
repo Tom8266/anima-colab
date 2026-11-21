@@ -96,6 +96,7 @@
 ## 开发
 
 协作流程（分支 / PR / Review / 提交前检查）见 [CONTRIBUTING.md](CONTRIBUTING.md)；
+发版节奏与步骤见 [RELEASING.md](RELEASING.md)（正式版最多每月一次）。
 PR 与 Issue 模板在 [`.github/`](.github/)。CI 会自动跑服务端检查、App 单测并打包 debug APK。
 
 ```bash
