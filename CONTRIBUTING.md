@@ -1,13 +1,13 @@
 # 参与开发（Contributing）
 
-欢迎一起完善 Anima Colab。这个项目是 **Android App + Colab 服务端** 两部分，推荐两个人按
-[GitHub Flow](https://docs.github.com/get-started/using-github/github-flow) 协作：
+欢迎一起完善 Anima Colab。这个项目是 **Android App + Colab 服务端** 两部分，两个人按
+[GitHub Flow](https://docs.github.com/get-started/using-github/github-flow) 协作就够了：
 
-- `main`：已发布 / 稳定，**不要直接 push**
-- `dev`：下一个版本的集成分支，功能先合到这里
-- 每个任务从 `dev` 开短分支，通过 Pull Request（PR）合回 `dev`
+- **`main` 是唯一长期分支**，始终保持 CI 绿、随时可以打 tag
+- 每个任务从 `main` 开一个短分支，通过 PR 合回 `main`
 - 合并前至少 1 人 Review + CI 通过
-- 每月最多正式发布一次，由维护者打 tag、附 APK（见 [RELEASING.md](RELEASING.md)）
+- **每个自然月最多正式发布一次**，发版只是打 tag + 发 Release，不需要长期 `dev` 分支
+- 详细发版步骤见 [RELEASING.md](RELEASING.md)
 
 ## 1. 本地环境
 
@@ -32,19 +32,18 @@ scripts/device_shots.sh --install --phase full --dim
 ## 2. 分支与 PR
 
 ```bash
-git switch dev
+git switch main
 git pull --ff-only
 git switch -c feat/short-description   # 或 fix/、docs/、refactor/
 ```
 
 分支模型：
 
-| 分支 | 用途 | 保护 |
+| 分支 | 用途 | 生命周期 |
 |---|---|---|
-| `main` | 已发布版本，只接 release / hotfix | ✅ |
-| `dev` | 下个版本集成，功能 PR 合到这里 | ✅ |
-| `feat/*`、`fix/*`、`docs/*` | 日常任务，从 `dev` 开 | 合并后删除 |
-| `release/vX.Y.Z` | 每月发版临时分支，PR 到 `main` | 发完删除 |
+| `main` | 唯一长期分支，已发布 / 待发布都在这里 | 永久，受保护 |
+| `feat/*`、`fix/*`、`docs/*` | 日常任务，从 `main` 开 | 1-2 天，合并后删除 |
+| `release/vX.Y.Z` | 可选：发版前需要冻结时才切 | 发完即删 |
 
 分支命名：
 
@@ -64,11 +63,10 @@ git commit -m "feat: 一句话说明"
 git push -u origin feat/short-description
 ```
 
-到 GitHub 开 PR，**base 选 `dev`**，填写 PR 模板，等 CI 和 Review。合并方式统一用
-**Squash and merge**。
+到 GitHub 开 PR，**base 选 `main`**，填写 PR 模板，等 CI 和 Review。合并方式统一用
+**Squash and merge**。合并后 GitHub 会自动删除 feature 分支。
 
-紧急 hotfix 可以例外从 `main` 开 `fix/*`，PR 到 `main`；发布后记得把 `main`
-同步回 `dev`。
+> 只有发版前需要“冻结”时，才临时切 `release/vX.Y.Z`；平时不需要。
 
 提交信息建议：
 
@@ -101,8 +99,7 @@ docs: 补充 Windows 构建说明
 - **安全**：仓库是公开的。不要在代码、文档、截图、日志里放 token、PAIR、隧道地址凭据、
   Google refresh token、keystore。App 的 OAuth client 是公开 installed-app client，可以保留。
 - **发布**：只由维护者操作，**每个自然月最多一次正式 release**。完整步骤见
-  [RELEASING.md](RELEASING.md)：改 `versionCode` / `versionName` → `release/vX.Y.Z`
-  → PR 到 `main` → 打 tag → 构建 APK → `gh release create` → 同步回 `dev`。
+  [RELEASING.md](RELEASING.md)：版本号 PR → 打 tag → 构建 APK → `gh release create`。
 
 ## 5. Review 约定
 
@@ -110,20 +107,20 @@ docs: 补充 Windows 构建说明
 - 作者不能自己批准自己的 PR；对方至少检查一次
 - Review 关注：行为是否正确、是否有测试/验证、接口是否同步、有没有泄露凭据
 - 风格问题不阻塞合并；正确性、数据安全、兼容性优先
-- 合并后删除 feature 分支，并同步本地 `dev`
+- 合并后删除 feature 分支，并同步本地 `main`
 
 ## 6. 遇到冲突
 
 ```bash
 git fetch origin
-git rebase origin/dev
+git rebase origin/main
 # 解决冲突
 git add <文件>
 git rebase --continue
 git push --force-with-lease
 ```
 
-只对自己的功能分支使用 `--force-with-lease`，**不要 force push `main` / `dev`**。
+只对自己的功能分支使用 `--force-with-lease`，**不要 force push `main`**。
 
 ## 7. 问题与讨论
 

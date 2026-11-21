@@ -6,22 +6,20 @@
 ## 分支模型
 
 ```text
-main                已发布 / 稳定，受保护
-  ↑ release PR（每月最多一次）
-dev                 下一个版本的集成分支，受保护
+main                唯一长期分支，CI 始终绿；日常功能 PR 直接合到这里
   ↑ feature PR
-feat/xxx            功能分支
-release/vX.Y.Z      发版临时分支（发完自动删除）
+feat/xxx            1-2 天的短分支
+
+main @ v0.2.0       每月最多打一个 tag，构建 APK + GitHub Release
 ```
 
-- 日常功能从 `dev` 开分支，PR 合回 `dev`
-- 每月从 `dev` 切 `release/vX.Y.Z`，PR 合到 `main`
-- 合并后打 tag、构建 APK、发 GitHub Release
-- `main` 只接受 release / 紧急 hotfix
+- 平时不需要 `dev` 分支；`main` 可以比最新 Release 新
+- 用户下载的是 Release 里的 APK，不是 `main` 分支
+- 只有发版前需要“冻结”时，才临时切 `release/vX.Y.Z`（可选，见第 3 节）
 
 ## 1. 发布前检查
 
-- [ ] `dev` 上 CI 全绿
+- [ ] `main` 上 CI 全绿
 - [ ] 真机跑过一轮：T4 一键启动 + 生成一张图；有条件再跑 TPU
 - [ ] `docs/contract.md` 与实际接口一致
 - [ ] `python3 colab/build_notebook.py` 后没有生成物 diff
@@ -37,29 +35,28 @@ versionCode = 2          // 每次 release +1
 versionName = "0.2.0"
 ```
 
-版本号改动先通过 PR 合到 `dev`，再从 `dev` 切 release 分支。
+单独开一个 PR（或作为最后一个功能 PR 的一部分）合到 `main`，确保版本号提交在 `main` 上。
 
-## 3. 切 release 分支
+## 3. 可选：需要冻结时切 release 分支
+
+大多数月份可以跳过这一步，直接在 `main` 上打 tag。
+
+如果发版前需要暂停新功能、只让紧急修复进入本版：
 
 ```bash
-git switch dev
+git switch main
 git pull --ff-only
 git switch -c release/v0.2.0
 git push -u origin release/v0.2.0
 ```
 
-在 GitHub 开 PR：`release/v0.2.0` → `main`
-
-- 标题：`release: v0.2.0`
-- 描述里贴发布摘要 / 验证结果
-- CI 通过 + 1 人 Approve 后 **Squash and merge**
-
-> 用临时 `release/...` 分支而不是直接 `dev → main`，是为了让“自动删除 head branch”
-> 只删临时分支，不会动到 `dev`。
+- 只往 `release/v0.2.0` 放紧急修复（从 `release/v0.2.0` 开 `fix/*`，PR 回它）
+- 发版前把 `release/v0.2.0` PR 到 `main`，Squash merge
+- 发完删除该分支（或让 GitHub 自动删除）
 
 ## 4. 打 tag
 
-在 `main` 的最新提交上：
+在 `main` 的最新发布提交上：
 
 ```bash
 git switch main
@@ -98,24 +95,11 @@ Release notes 至少包含：
 - 已知限制（T4 / TPU、免费 Colab 限制）
 - 升级 / 安装说明
 
-## 7. 发布后同步
-
-把 `main` 的发布提交同步回 `dev`，避免下个版本落后：
-
-```bash
-git switch dev
-git pull --ff-only
-git merge main
-git push
-```
-
-> `dev` 也受保护；维护者可用管理员权限直接 push 这一步，或者开一个
-> `chore/sync-main-into-dev` PR 让另一个人 Approve。普通协作者请走 PR。
-
-## 8. 收尾
+## 7. 收尾
 
 - [ ] Release 页面已发布，APK 可下载，SHA-256 一致
-- [ ] `main` / `dev` 已同步
 - [ ] 相关 Issue / Milestone 关闭
 - [ ] 下个版本的 Issue 已建好
 - [ ] 本月不再发第二个正式版（hotfix 例外）
+
+> 如果使用了 `release/vX.Y.Z` 分支，确认它已合并到 `main` 并删除。
