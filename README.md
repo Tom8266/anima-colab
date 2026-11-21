@@ -1,5 +1,8 @@
 # Anima Colab → Android
 
+[![CI](https://github.com/Tom8266/anima-colab/actions/workflows/ci.yml/badge.svg)](https://github.com/Tom8266/anima-colab/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 手机 App（Kotlin + Jetpack Compose）通过 **Cloudflare 快速隧道 + token 鉴权** 连接 Google Colab 上运行的 ComfyUI，
 用 **Anima（2B DiT 动漫模型）** 文生图。一键模式支持 **T4 GPU**（默认，fp16）和 **TPU v5e1**（实验，bf16，约 2 倍速）。
 不搬 ComfyUI 前端，只保留手机真正需要的功能。
@@ -91,6 +94,9 @@
 5. **写提示词**：「速查」页有 288 个中文分类 Danbooru tag、10 套模板、常用片段与负向预设，点一下就插入。
 
 ## 开发
+
+协作流程（分支 / PR / Review / 提交前检查）见 [CONTRIBUTING.md](CONTRIBUTING.md)；
+PR 与 Issue 模板在 [`.github/`](.github/)。CI 会自动跑服务端检查、App 单测并打包 debug APK。
 
 ```bash
 scripts/build.sh            # 构建 debug APK

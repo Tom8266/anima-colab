@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 使用与排错文档
+    url: https://github.com/Tom8266/anima-colab/blob/main/docs/colab-setup.md
+    about: 先看这里：Colab 部署、配对、常见问题
+  - name: 接口契约
+    url: https://github.com/Tom8266/anima-colab/blob/main/docs/contract.md
+    about: App / 网关 / ComfyUI 的接口以这份文档为准
+  - name: 参与开发
+    url: https://github.com/Tom8266/anima-colab/blob/main/CONTRIBUTING.md
+    about: 分支、PR、提交前检查、TPU 注意事项
