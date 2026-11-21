@@ -8,6 +8,7 @@
 - 合并前至少 1 人 Review + CI 通过
 - **每个自然月最多正式发布一次**，发版只是打 tag + 发 Release，不需要长期 `dev` 分支
 - 详细发版步骤见 [RELEASING.md](RELEASING.md)
+- 两人的分工、看板、每日节奏和 GitHub 侧配置见 [docs/COLLAB.md](docs/COLLAB.md)
 
 ## 1. 本地环境
 

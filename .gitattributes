@@ -1,0 +1,17 @@
+# 换行符：脚本必须是 LF，否则 Windows 上 Git Bash、CI 的 ubuntu-latest 都会报 \r 错误
+*.sh      text eol=lf
+gradlew   text eol=lf
+*.py      text eol=lf
+*.bat     text eol=crlf
+*.cmd     text eol=crlf
+
+# 二进制：不要做文本转换，也别尝试 diff
+*.jar     binary
+*.apk     binary
+*.png     binary
+*.jpg     binary
+*.jpeg    binary
+*.webp    binary
+*.gif     binary
+*.ttf     binary
+*.otf     binary
