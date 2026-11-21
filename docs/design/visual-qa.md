@@ -2,7 +2,7 @@
 
 > 执行：device-qa（真机截图 / 视觉 QA）  
 > 日期：2026-11-14（最终版截图 22:36–22:40 重拍；APK 22:24 构建，md5 `261d56ac3ee9a962b74cb8644d91e47c`）
-> 设备：Xiaomi M2012K11AC · Android 17 / API 37 · 1080×2400 @440dpi（392×873dp）· adb `ef9ca6f9`
+> 设备：Xiaomi M2012K11AC · Android 17 / API 37 · 1080×2400 @440dpi（392×873dp）· adb 自动识别
 > 截图流水线：`scripts/device_shots.sh --install --phase full`（`scripts/mock_gateway.py` 假网关 + `adb reverse tcp:8091` + prefs 注入，不依赖真实 Colab 会话）
 > 问题分档：**P0** 崩溃/ANR/功能不可用；**P1** 主流程可见缺陷（非阻塞）；**P2** 体验/一致性优化；**观察项** 非缺陷。
 

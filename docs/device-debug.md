@@ -6,7 +6,7 @@
 调试这个 App 时手机经常要常亮几十分钟，AMOLED 长期高亮既费电又有烧屏风险。
 下面按「完全不亮 → 短时亮」排序，最后一种是本项目截图流水线的做法。
 
-> 设备基线：Xiaomi M2012K11AC / Android 17（API 37）/ adb `ef9ca6f9`。
+> 设备基线：Xiaomi M2012K11AC / Android 17（API 37）/ adb 自动识别。
 > 大多数命令对 Android 12+ 通用；标了版本的是新 API。
 
 ## 0. 一句话选型

@@ -16,7 +16,7 @@
 #   --install          构建并安装 debug APK（内部调用 scripts/team-build.sh，带 flock 串行锁）
 #   --phase a|full     a = 01-10 基础截图（默认）；full = a + 空图库/连接失败/生成中/生成结果
 #   --outdir DIR       截图输出目录（默认 docs/screenshots/redesign）
-#   --serial ID        设备序列号（默认取 $ADB_SERIAL 或 ef9ca6f9）
+#   --serial ID        设备序列号（默认取 $ADB_SERIAL，否则自动选第一台在线设备）
 #   --no-light         跳过浅色主题截图（09/10）
 #   --dim              把手机面板亮度压到最低（截图取的是帧缓冲，画质不受影响；只为护 AMOLED），退出时恢复
 #   --extras           额外验证键盘态 / 存模板弹窗 / 字体放大 1.3 / 横屏（输出到 docs/screenshots/qa）
@@ -70,7 +70,7 @@ source "$ROOT/scripts/env.sh"
 # ---------------------------------------------------------------- 配置
 PACKAGE="com.tom.animacolab"
 ACTIVITY=".MainActivity"
-SERIAL="${ADB_SERIAL:-ef9ca6f9}"
+SERIAL="${ADB_SERIAL:-}"
 PORT="${MOCK_PORT:-8091}"
 BASE_URL="http://127.0.0.1:${PORT}"
 TOKEN="${MOCK_TOKEN:-devtoken}"
@@ -142,8 +142,11 @@ preflight() {
     command -v curl >/dev/null || die "找不到 curl"
     local devices
     devices=$(adb devices | awk 'NR>1 && $2=="device" {print $1}')
-    if ! printf '%s\n' "$devices" | grep -qx "$SERIAL"; then
-        die "设备 $SERIAL 未连接/未授权。当前在线设备: $(printf '%s' "$devices" | tr '\n' ' ')"
+    if [ -z "$SERIAL" ]; then
+        SERIAL=$(printf '%s\n' "$devices" | head -1)
+    fi
+    if [ -z "$SERIAL" ] || ! printf '%s\n' "$devices" | grep -qx "$SERIAL"; then
+        die "设备 ${SERIAL:-<未指定>} 未连接/未授权。当前在线设备: $(printf '%s' "$devices" | tr '\n' ' ')"
     fi
     log "设备: $SERIAL ($(adbx shell getprop ro.product.model 2>/dev/null | tr -d '\r'))  " \
         "$(adbx shell wm size 2>/dev/null | tr -d '\r')"

@@ -2,7 +2,7 @@
 
 Android App（Kotlin + Compose）通过 Cloudflare 隧道连接 Colab 上的 ComfyUI 出图。
 结构：`android/` App、`colab/` 服务端、`docs/`（contract / DESIGN / QA / device-debug）、`scripts/` 工具。
-真机：Xiaomi M2012K11AC（adb `ef9ca6f9`），1080×2400 @440dpi（392×873dp）。
+真机：Xiaomi M2012K11AC（adb 自动识别），1080×2400 @440dpi（392×873dp）。
 
 ## 真机调试：默认熄屏
 
