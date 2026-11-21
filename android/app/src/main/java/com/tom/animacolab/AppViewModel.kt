@@ -28,6 +28,7 @@ import com.tom.animacolab.data.Snippet
 import com.tom.animacolab.data.Tag
 import com.tom.animacolab.data.TagCategory
 import com.tom.animacolab.data.ThemeMode
+import com.tom.animacolab.colab.ColabAccelerator
 import com.tom.animacolab.colab.ColabSessionManager
 import com.tom.animacolab.colab.ColabSessionStore
 import kotlinx.coroutines.CancellationException
@@ -66,6 +67,7 @@ data class UiState(
     val message: String? = null,
     val session: ColabSessionManager.State = ColabSessionManager.State.Off,
     val deployLogs: List<String> = emptyList(),
+    val colabAccelerator: ColabAccelerator = ColabAccelerator.T4,
     val googleLoggedIn: Boolean = false,
     val authUrlToOpen: String? = null,
     val autoDownload: Boolean = true,
@@ -132,6 +134,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                 backgroundKeepalive = store.backgroundKeepalive,
                 themeMode = store.themeMode,
                 dynamicColor = store.dynamicColor,
+                colabAccelerator = ColabAccelerator.fromId(colabSessionStore.accelerator),
                 connection = if (config.configured) ConnectionState.Checking else ConnectionState.NotConfigured,
             )
         }
@@ -319,6 +322,18 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    fun setColabAccelerator(accelerator: ColabAccelerator) {
+        if (accelerator == _state.value.colabAccelerator) return
+        val session = _state.value.session
+        if (colabSession.isBusy || session is ColabSessionManager.State.Ready) {
+            message("先停止当前 Colab 会话，再切换运行设备")
+            return
+        }
+        colabSessionStore.accelerator = accelerator.id
+        _state.update { it.copy(colabAccelerator = accelerator) }
+        message(if (accelerator.isTpu) "已选 TPU v5e1：首次部署会打 TPU 补丁，首图需编译" else "已切回 T4 GPU")
+    }
+
     fun startColabSession() {
         if (!googleAuth.isLoggedIn()) {
             message("先登录 Google 账号")
@@ -326,7 +341,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         }
         colabSession.forgetFailure()
         colabSession.start()
-        message("正在启动 Colab T4…")
+        message("正在启动 Colab ${_state.value.colabAccelerator.label}…")
     }
 
     fun cancelColabStart() {
@@ -840,7 +855,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val info = s.info ?: return "未连接"
         val device = info.device ?: s.connection.let { (it as? ConnectionState.Ready)?.health?.device }.orEmpty()
         val vram = info.vramTotalGb?.let { "%.1fG".format(Locale.US, it) }.orEmpty()
-        return listOf(device, vram).filter { it.isNotBlank() }.joinToString(" · ").ifBlank { "T4" }
+        return listOf(device, vram).filter { it.isNotBlank() }.joinToString(" · ")
+            .ifBlank { s.colabAccelerator.shortLabel }
     }
 
     private fun nodeLabel(node: String?): String? = when (node) {

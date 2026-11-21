@@ -5,8 +5,8 @@ This mirrors what the Android App will do, so the Kotlin implementation can be
 written against a working, documented chain:
 
     1. refresh a Google OAuth access token      (colab-cli refresh_token)
-    2. GET  /tun/m/assignments                  -> reuse an existing T4 session
-    3. GET/POST /tun/m/assign                   -> assign a T4 when none exists
+    2. GET  /tun/m/assignments                  -> reuse an existing T4 / TPU session
+    3. GET/POST /tun/m/assign                   -> assign a T4 / TPU v5e1 when none exists
     4. POST <runtimeProxyInfo.url>/api/kernels  -> create a python3 kernel
     5. WS   /api/kernels/<id>/channels          -> Jupyter default protocol
     6. execute_request with colab/deploy_script.py source
@@ -247,17 +247,32 @@ def list_assignments(http, access_token):
     return data.get("assignments") or []
 
 
-def pick_t4(assignments):
+ACCELERATORS = {
+    "t4": {"api": "T4", "variant": 1, "label": "T4"},
+    "tpu": {"api": "V5E1", "variant": 2, "label": "TPU v5e1"},
+}
+
+
+def pick_accelerator(assignments, accelerator):
+    target = ACCELERATORS[accelerator]
     for assignment in assignments:
-        if str(assignment.get("accelerator", "")).upper() == "T4":
+        name = str(assignment.get("accelerator", "")).upper()
+        variant = int(assignment.get("variant") or 0)
+        if name == target["api"] and variant in (0, target["variant"]):
             return assignment
     return None
 
 
-def assign_t4(http, access_token, retries=3, backoff=10.0):
+def assign_accelerator(http, access_token, accelerator, retries=3, backoff=10.0):
     """GET /tun/m/assign then POST with the returned XSRF token (CLI protocol)."""
+    target = ACCELERATORS[accelerator]
     nbh = uuid_to_nbh()
-    params = {"nbh": nbh, "variant": "GPU", "accelerator": "T4", "authuser": "0"}
+    params = {
+        "nbh": nbh,
+        "variant": "TPU" if accelerator == "tpu" else "GPU",
+        "accelerator": target["api"],
+        "authuser": "0",
+    }
     for attempt in range(retries + 1):
         try:
             first = colab_request(http, access_token, "GET", "/tun/m/assign",
@@ -512,6 +527,8 @@ def main(argv=None):
                         help="proxy URL for Google domains needing it (e.g. http://127.0.0.1:7890)")
     parser.add_argument("--proxy-runtime", default=None,
                         help="proxy URL for Colab runtime HTTP/WS (default: direct, then --proxy)")
+    parser.add_argument("--accelerator", choices=sorted(ACCELERATORS), default="t4",
+                        help="Colab accelerator to reuse/assign (default: t4)")
     parser.add_argument("--max-assign-wait", type=float, default=600.0)
     parser.add_argument("--exec-file", default=str(DEFAULT_DEPLOY_SCRIPT),
                         help="file whose source is sent to the kernel (default: deploy_script.py)")
@@ -557,14 +574,15 @@ def main(argv=None):
         log("  endpoint=%s accelerator=%s variant=%s url=%s"
             % (assignment.get("endpoint"), assignment.get("accelerator"),
                assignment.get("variant"), info.get("url")))
-    assignment = pick_t4(assignments)
+    label = ACCELERATORS[args.accelerator]["label"]
+    assignment = pick_accelerator(assignments, args.accelerator)
     if assignment is None:
-        log("no T4 assignment found, requesting a new one (may take a few minutes)")
+        log("no %s assignment found, requesting a new one (may take a few minutes)" % label)
         started = time.time()
-        assignment = assign_t4(http, access_token)
-        log("assigned T4 in %.1fs" % (time.time() - started))
+        assignment = assign_accelerator(http, access_token, args.accelerator)
+        log("assigned %s in %.1fs" % (label, time.time() - started))
     else:
-        log("reusing existing T4 assignment: %s" % assignment.get("endpoint"))
+        log("reusing existing %s assignment: %s" % (label, assignment.get("endpoint")))
     proxy_info = assignment.get("runtimeProxyInfo") or {}
     if not proxy_info.get("url") or not proxy_info.get("token"):
         raise RuntimeError("assignment has no runtimeProxyInfo: %r" % (assignment,))
@@ -603,8 +621,9 @@ def main(argv=None):
         log("== step 4: execute %s (%d bytes) ==" % (deploy_path, len(code)))
     # make sure the kernel cwd is /content (the Colab working directory)
     prelude = ("import os\n"
+               "os.environ['ANIMA_ACCELERATOR'] = '%s'\n"
                "os.makedirs('/content', exist_ok=True)\n"
-               "os.chdir('/content')\n")
+               "os.chdir('/content')\n" % args.accelerator)
     code = prelude + code + "\n"
 
     # -- 5. execute + stream ------------------------------------------------

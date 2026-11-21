@@ -17,11 +17,14 @@ import kotlinx.coroutines.launch
 import java.util.UUID
 
 /**
- * 「一键模式」会话管理器：登录 Google 后，自动复用/申请 Colab T4 会话 →
+ * 「一键模式」会话管理器：登录 Google 后，自动复用/申请 Colab T4 或 TPU v5e1 会话 →
  * 创建 Jupyter kernel → 在 kernel 里执行内置部署脚本 → 解析 PAIR → 自动完成 App 配对。
  *
  * 部署脚本 assets/colab_deploy.py 与 Colab 笔记本是同一份逻辑（幂等）：
  * 已部署过的会话几秒内就能返回 PAIR；新会话首次约 3-5 分钟。
+ *
+ * TPU 模式通过环境变量 `ANIMA_ACCELERATOR=tpu` 让部署脚本打 ComfyUI 设备补丁、
+ * 改用 bf16 启动；每个 kernel 都是新建的，避免 kernel 先 import torch 占住 TPU。
  */
 class ColabSessionManager(
     private val context: Context,
@@ -67,9 +70,13 @@ class ColabSessionManager(
     val isBusy: Boolean
         get() = _state.value is State.Starting || _state.value is State.Deploying
 
+    /** 当前选中的加速卡（UI 修改后会先写入 store，再调用 [start]）。 */
+    fun selectedAccelerator(): ColabAccelerator = ColabAccelerator.fromId(store.accelerator)
+
     fun start() {
         if (startJob?.isActive == true) return
-        startJob = scope.launch { runStart() }
+        val accelerator = selectedAccelerator()
+        startJob = scope.launch { runStart(accelerator) }
     }
 
     fun cancelStart() {
@@ -82,7 +89,7 @@ class ColabSessionManager(
         if (_state.value is State.Failed) _state.value = State.Off
     }
 
-    private suspend fun runStart() {
+    private suspend fun runStart(accelerator: ColabAccelerator) {
         if (!auth.isLoggedIn()) {
             _state.value = State.Failed("先登录 Google 账号，才能自动创建 Colab 会话")
             return
@@ -95,16 +102,25 @@ class ColabSessionManager(
 
             appendLog("检查账号下的 Colab 会话…")
             val assignments = api.listAssignments()
-            var assignment = assignments.firstOrNull { store.endpoint.isNotBlank() && it.endpoint == store.endpoint }
-                ?: assignments.firstOrNull { it.accelerator.equals("T4", true) && it.variant == 1 }
+            var assignment = assignments.firstOrNull {
+                store.endpoint.isNotBlank() && it.endpoint == store.endpoint &&
+                    accelerator.matches(it.accelerator, it.variant)
+            } ?: assignments.firstOrNull {
+                accelerator.matches(it.accelerator, it.variant)
+            }
             if (assignment == null) {
-                appendLog("没有现成 T4 会话，正在申请（免费版约 30-90 秒）…")
-                _state.value = State.Deploying("申请 T4 会话…", _logs.value.size)
-                assignment = api.assign(ColabApi.notebookHash(UUID.randomUUID()), "T4")
+                val others = assignments.count { !accelerator.matches(it.accelerator, it.variant) }
+                if (others > 0) {
+                    appendLog("账号下还有 $others 个其它类型的会话；Colab 会话数受限时先停止旧会话")
+                }
+                appendLog("没有现成 ${accelerator.label} 会话，正在申请（免费版约 30-90 秒）…")
+                _state.value = State.Deploying("申请 ${accelerator.label} 会话…", _logs.value.size)
+                assignment = api.assign(ColabApi.notebookHash(UUID.randomUUID()), accelerator)
             } else {
-                appendLog("复用已有会话：${assignment.endpoint}")
+                appendLog("复用已有 ${accelerator.label} 会话：${assignment.endpoint}")
             }
             store.endpoint = assignment.endpoint
+            store.accelerator = accelerator.id
             rememberProxy(assignment.runtimeProxy)
 
             val proxy = ensureProxyFresh(api)
@@ -119,13 +135,13 @@ class ColabSessionManager(
             store.kernelId = kernelId
             appendLog("kernel 已创建：$kernelId")
 
-            appendLog("开始部署 ComfyUI + Anima（首次约 3-5 分钟，已部署过会快很多）…")
+            appendLog("开始部署 ComfyUI + Anima（${accelerator.label}，首次约 3-5 分钟，已部署过会快很多）…")
             _state.value = State.Deploying("部署中…", _logs.value.size)
 
             val parser = LineBuffer()
             val ok = kernelClient.execute(
                 kernelId = kernelId,
-                code = readDeployScript(),
+                code = readDeployScript(accelerator),
                 timeoutMs = 20 * 60 * 1000L,
                 onStream = { _, text ->
                     parser.feed(text).forEach { line -> handleDeployLine(line) }
@@ -149,7 +165,7 @@ class ColabSessionManager(
             store.pairToken = found.token
             store.startedAtMs = System.currentTimeMillis()
             _pair.value = found
-            _state.value = State.Ready(deviceLabel(), store.startedAtMs)
+            _state.value = State.Ready(accelerator.label, store.startedAtMs)
             appendLog("✅ Colab 已就绪，PAIR 已自动填入：${found.baseUrl}")
             startKeepalive()
         } catch (e: CancellationException) {
@@ -252,7 +268,7 @@ class ColabSessionManager(
         if (isBusy) return _state.value is State.Ready
         if (_state.value is State.Ready) return true
         if (!store.hasPair || store.endpoint.isBlank() || !auth.isLoggedIn()) return false
-        _state.value = State.Ready("T4", store.startedAtMs)
+        _state.value = State.Ready(selectedAccelerator().label, store.startedAtMs)
         appendLog("恢复上次的 Colab 会话，已启动后台保活")
         startKeepalive()
         return true
@@ -274,8 +290,13 @@ class ColabSessionManager(
 
     // ---------------- 内部 ----------------
 
-    private fun readDeployScript(): String =
-        context.assets.open("colab_deploy.py").bufferedReader(Charsets.UTF_8).use { it.readText() }
+    private fun readDeployScript(accelerator: ColabAccelerator): String {
+        val source = context.assets.open("colab_deploy.py")
+            .bufferedReader(Charsets.UTF_8).use { it.readText() }
+        // 部署脚本同时用于笔记本的“运行时自动识别”；App 明确知道申请的是哪种卡，
+        // 用环境变量传下去，脚本会在检测结果不一致时快速失败并给出提示。
+        return "import os\nos.environ['ANIMA_ACCELERATOR'] = '${accelerator.deployMode}'\n" + source
+    }
 
     private fun rememberProxy(proxy: RuntimeProxyInfo) {
         store.runtimeUrl = proxy.url
@@ -294,8 +315,6 @@ class ColabSessionManager(
         rememberProxy(assignment.runtimeProxy)
         return assignment.runtimeProxy
     }
-
-    private fun deviceLabel(): String = "T4"
 
     private fun handleDeployLine(rawLine: String) {
         val line = rawLine.trimEnd()
@@ -331,7 +350,7 @@ class ColabSessionManager(
         is ColabProtocolException -> when (e.statusCode) {
             401 -> "Google 登录已过期，请重新登录"
             412 -> "Colab 提示同时会话数太多/额度不足：先停止旧会话再试"
-            400 -> "Colab 拒绝了 T4 申请（可能没有免费额度），可稍后重试"
+            400 -> "Colab 拒绝了 ${selectedAccelerator().label} 申请（可能没有免费额度或该规格不可用），可稍后重试"
             else -> e.message ?: "Colab 请求失败"
         }
         else -> e.message ?: "未知错误"

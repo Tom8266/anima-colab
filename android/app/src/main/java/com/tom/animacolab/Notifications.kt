@@ -70,7 +70,7 @@ object Notifications {
         NotificationCompat.Builder(context, CHANNEL_SESSION)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle("Anima Colab 会话运行中")
-            .setContentText("T4 保活中，生成图片不受影响")
+            .setContentText("Colab 保活中，生成图片不受影响")
             .setOngoing(true)
             .setSilent(true)
             .setContentIntent(openAppPendingIntent(context))
@@ -86,7 +86,7 @@ object Notifications {
                 LOST_NOTIF_ID,
                 NotificationCompat.Builder(context, CHANNEL_GENERATION)
                     .setSmallIcon(R.drawable.ic_notification)
-                    .setContentTitle("Colab T4 已就绪")
+                    .setContentTitle("Colab 已就绪")
                     .setContentText("会话已连接，可以开始生成图片")
                     .setAutoCancel(true)
                     .setContentIntent(openAppPendingIntent(context))

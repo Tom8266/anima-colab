@@ -109,6 +109,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import com.tom.animacolab.AppViewModel
 import com.tom.animacolab.UiState
+import com.tom.animacolab.colab.ColabAccelerator
 import com.tom.animacolab.colab.ColabSessionManager
 import com.tom.animacolab.data.ConnectionState
 import com.tom.animacolab.data.JobState
@@ -478,7 +479,7 @@ private fun OneTapHero(
                 alpha = 0.18f,
             )
             Column(Modifier.padding(Spacing.card)) {
-                HeroEyebrow()
+                HeroEyebrow(state.colabAccelerator.shortLabel)
                 Spacer(Modifier.height(Spacing.lg))
                 when (session) {
                     is ColabSessionManager.State.Starting -> HeroBusyContent(
@@ -502,9 +503,9 @@ private fun OneTapHero(
                     is ColabSessionManager.State.Ready -> HeroPairingContent(onOpenSettings)
 
                     else -> if (state.googleLoggedIn) {
-                        HeroStartContent(vm::startColabSession, onOpenSettings)
+                        HeroStartContent(vm::startColabSession, onOpenSettings, state.colabAccelerator)
                     } else {
-                        HeroLoginContent(vm, onOpenSettings)
+                        HeroLoginContent(vm, onOpenSettings, state.colabAccelerator)
                     }
                 }
             }
@@ -513,7 +514,7 @@ private fun OneTapHero(
 }
 
 @Composable
-private fun HeroEyebrow() {
+private fun HeroEyebrow(accelerator: String) {
     Surface(
         shape = AnimaShape.pill,
         color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f),
@@ -526,7 +527,7 @@ private fun HeroEyebrow() {
             Icon(Icons.Outlined.Cloud, contentDescription = null, modifier = Modifier.size(16.dp))
             Spacer(Modifier.width(Spacing.xs))
             Text(
-                "Colab T4 · ComfyUI",
+                "Colab $accelerator · ComfyUI",
                 style = MaterialTheme.typography.labelMediumEmphasized,
             )
         }
@@ -534,11 +535,15 @@ private fun HeroEyebrow() {
 }
 
 @Composable
-private fun HeroLoginContent(vm: AppViewModel, onOpenSettings: () -> Unit) {
+private fun HeroLoginContent(
+    vm: AppViewModel,
+    onOpenSettings: () -> Unit,
+    accelerator: ColabAccelerator,
+) {
     var showLoginCode by rememberSaveable { mutableStateOf(false) }
     HeroTitle("连上云端画布")
     Spacer(Modifier.height(Spacing.sm))
-    HeroBody("登录 Google 后，一键创建 Colab T4 会话：自动部署 ComfyUI + Anima 并完成配对。")
+    HeroBody("登录 Google 后，一键创建 Colab ${accelerator.shortLabel} 会话：自动部署 ComfyUI + Anima 并完成配对。")
     Spacer(Modifier.height(Spacing.lg))
     PrimaryActionButton(
         text = "登录 Google",
@@ -564,13 +569,20 @@ private fun HeroLoginContent(vm: AppViewModel, onOpenSettings: () -> Unit) {
 }
 
 @Composable
-private fun HeroStartContent(onStart: () -> Unit, onOpenSettings: () -> Unit) {
+private fun HeroStartContent(
+    onStart: () -> Unit,
+    onOpenSettings: () -> Unit,
+    accelerator: ColabAccelerator,
+) {
     HeroTitle("开始云端创作")
     Spacer(Modifier.height(Spacing.sm))
-    HeroBody("点一下自动创建 Colab T4、部署 ComfyUI + Anima、完成配对（首次约 3-5 分钟）。")
+    HeroBody(
+        "点一下自动创建 Colab ${accelerator.shortLabel}、部署 ComfyUI + Anima、完成配对" +
+            if (accelerator.isTpu) "（首次约 4-6 分钟，首图需编译）。" else "（首次约 3-5 分钟）。",
+    )
     Spacer(Modifier.height(Spacing.lg))
     PrimaryActionButton(
-        text = "一键启动 Colab T4",
+        text = "一键启动 Colab ${accelerator.shortLabel}",
         onClick = onStart,
         modifier = Modifier.fillMaxWidth(),
     )

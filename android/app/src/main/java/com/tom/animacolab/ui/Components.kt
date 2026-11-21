@@ -322,12 +322,14 @@ fun SegmentedOptions(
     selectedIndex: Int,
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier,
+    enabled: Boolean = true,
 ) {
     SingleChoiceSegmentedButtonRow(modifier = modifier.fillMaxWidth()) {
         options.forEachIndexed { index, label ->
             SegmentedButton(
                 selected = index == selectedIndex,
                 onClick = { onSelect(index) },
+                enabled = enabled,
                 shape = SegmentedButtonDefaults.itemShape(index = index, count = options.size),
                 colors = SegmentedButtonDefaults.colors(
                     activeContainerColor = MaterialTheme.colorScheme.primary,

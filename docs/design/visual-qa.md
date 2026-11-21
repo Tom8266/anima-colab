@@ -163,7 +163,7 @@ scripts/device_shots.sh --install --phase full --extras   # 额外拍键盘/弹�
 # 依赖：adb 真机、python3、curl；mock 网关脚本内置（127.0.0.1:8091）
 ```
 
-**截图清单**（`docs/screenshots/redesign/`，共 15 张，全部为 1080×2400）：
+**截图清单**（`docs/screenshots/redesign/`，共 16 张，全部为 1080×2400）：
 
 | 文件 | 状态 | 主题 |
 |---|---|---|
@@ -182,6 +182,7 @@ scripts/device_shots.sh --install --phase full --extras   # 额外拍键盘/弹�
 | `13-generate-running.png` | 生成中（进度卡；常驻条按进度卡可见性隐藏） | 品牌深色 |
 | `14-generate-result.png` | 生成成功结果卡 | 品牌深色 |
 | `15-dynamic-color.png` | 动态取色 Material You 对照 | 深色 + 动态色 |
+| `16-settings-tpu.png` | 设置页 · 运行设备选 TPU v5e1 | 品牌深色 |
 
 ## 10. 追补修复记录（2026-11-14 晚；已被 §11 最终复验覆盖）
 
@@ -255,3 +256,13 @@ scripts/device_shots.sh --install --phase full --extras   # 额外拍键盘/弹�
 **验证**：真机登出 → 设置 →「粘贴授权码完成登录」，弹窗出现授权码输入框、自动聚焦、
 键盘弹出；输入任意文本后确认按钮启用。截图：
 `docs/screenshots/qa/21-login-code-dialog.png`（手动补充，`--extras` 不改登录态）。
+
+## 12. TPU 档位视觉补充（2026-11-21）
+
+- 设置页 Hero 上方新增「运行设备」卡片：T4 GPU / TPU v5e1 分段选择 + 当前档位说明。
+  仅在未启动 / 启动失败时显示；Starting / Deploying / Ready 时隐藏，避免运行中误切。
+- `07-settings.png` / `10-light-settings.png` 已重拍（主状态默认 T4）；
+  `16-settings-tpu.png` 单独记录 TPU 选中态。
+- 真机确认：TPU 选中后 Hero 标题/副标题/按钮/停止确认文案随档位变化；
+  TPU Ready 显示 `TPU v5e1 · 15.7G · 队列 0`；深浅色下分段控件、说明文字均无截断/重叠。
+- 真实 TPU 一键启动与出图证据见 [`colab/TESTING.md` §9](../../colab/TESTING.md)。

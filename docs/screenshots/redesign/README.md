@@ -1,11 +1,11 @@
 # 重设计真机截图（Material 3 Expressive）
 
 全部为真机截图（Xiaomi M2012K11AC · Android 17 / API 37 · 1080×2400 @440dpi，即 392×873dp）。
-2026-11-14 22:36–22:40 用最终 APK（md5 `261d56ac3ee9a962b74cb8644d91e47c`）重拍。
+2026-11-21 15:47–15:51 用最终 APK（含 T4 / TPU v5e1 档位）重拍；主体状态默认 T4，`16` 单独展示 TPU 选中态。
 数据来自本地 mock 网关（`scripts/mock_gateway.py`），不依赖真实 Colab 会话；可一键复现：
 
 ```bash
-scripts/device_shots.sh --install --phase full            # 15 张交付截图
+scripts/device_shots.sh --install --phase full            # 15 张主体截图 + 16 TPU 档位图
 scripts/device_shots.sh --install --phase full --extras   # 另拍键盘/弹窗/字体/横屏 → docs/screenshots/qa/
 ```
 
@@ -28,6 +28,7 @@ scripts/device_shots.sh --install --phase full --extras   # 另拍键盘/弹窗/
 | `13-generate-running.png` | 生成中（波浪进度 / 百分比 / 已用时长 / 中断；无双进度） | 深色 + 品牌色 |
 | `14-generate-result.png` | 生成完成结果卡（大图 + 保存/分享/填回/图库） | 深色 + 品牌色 |
 | `15-dynamic-color.png` | **Material You 动态取色**（与 01 对照，证明壁纸取色生效） | 深色 + 动态取色 |
+| `16-settings-tpu.png` | 设置页：运行设备切到 **TPU v5e1**（实验档，含补丁/编译说明） | 深色 + 品牌色 |
 
 ## 设计验收
 

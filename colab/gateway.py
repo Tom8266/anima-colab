@@ -41,7 +41,11 @@ SIZE_DIRS = {
     "loras": "loras",
 }
 
-_device_cache = {"name": "unknown", "vram_total_gb": 0.0}
+# 部署脚本会传入实际加速卡；TPU 的 ComfyUI /system_stats 只报 "tpu"，
+# 用 DEVICE_LABEL 把它变成 App 里更好读的 "TPU v5e1"。
+ACCELERATOR = os.environ.get("ANIMA_ACCELERATOR", "").strip().lower()
+DEVICE_LABEL = os.environ.get("ANIMA_DEVICE_LABEL", "").strip()
+_device_cache = {"name": DEVICE_LABEL or "unknown", "vram_total_gb": 0.0}
 
 
 def _err(status, error):
@@ -71,6 +75,8 @@ class _UpstreamError(Exception):
 
 def _probe_device():
     """Best-effort GPU name/VRAM via nvidia-smi, cached at startup."""
+    if ACCELERATOR == "tpu":
+        return
     try:
         out = subprocess.run(
             ["nvidia-smi", "--query-gpu=name,memory.total", "--format=csv,noheader,nounits"],
@@ -280,10 +286,15 @@ async def handle_health(request):
     if devices and isinstance(devices[0], dict):
         cleaned = _clean_device_name(devices[0].get("name"))
         if cleaned:
+            if cleaned.lower() == "tpu" and DEVICE_LABEL:
+                cleaned = DEVICE_LABEL
             payload["device"] = cleaned
+            # /info 只读 _device_cache；TPU 没有 nvidia-smi，必须在这里回填。
+            _device_cache["name"] = cleaned
         vram = devices[0].get("vram_total")
         if isinstance(vram, (int, float)) and vram > 0:
             payload["vram_total_gb"] = round(vram / 1024 ** 3, 1)
+            _device_cache["vram_total_gb"] = payload["vram_total_gb"]
     if authed:
         try:
             queue = await _fetch_json(session, "/queue", timeout=3.0)

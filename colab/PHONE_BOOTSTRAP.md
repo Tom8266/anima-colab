@@ -9,12 +9,19 @@
 - 实测会话：`[anima] gpu-t4-s-usw1b2-ycpdkwttgegi | T4 | Standard`
 - 实测 PAIR：`https://privileges-package-wilson-west.trycloudflare.com|<token>`
   （token 不落文档；本机测试凭据见 `/content/anima_token.txt`，只存在于 VM 内）
+- 2026-11-21 扩展：`--accelerator tpu` 可复刻 App 的 TPU v5e1 一键模式
+  （`variant=TPU&accelerator=V5E1`；脚本注入 `ANIMA_ACCELERATOR=tpu`，TPU 部署细节见
+  [`TESTING.md` §9](TESTING.md)）。以下以 T4 为例。
 
 ## 0. 命令
 
 ```bash
 # 本机（Google 域需要代理；App 在手机直连网络下不需要 --proxy）
 python3 colab/phone_bootstrap.py --proxy http://127.0.0.1:7890 \
+        --pair-out /tmp/pair.txt
+
+# TPU v5e1（复用/申请 TPU 会话）
+python3 colab/phone_bootstrap.py --accelerator tpu --proxy http://127.0.0.1:7890 \
         --pair-out /tmp/pair.txt
 
 # 调试：通过同一条 kernel 通道执行任意代码（等价 App 的“远程执行”能力）

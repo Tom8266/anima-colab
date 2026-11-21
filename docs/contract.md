@@ -12,7 +12,8 @@ Android App ──HTTPS/WSS──> Cloudflare Quick Tunnel ──> Colab VM
 
 - App **不加载** ComfyUI 前端，只调网关 API。
 - Colab 里 ComfyUI 只监听 127.0.0.1，公网只暴露网关；网关加 token 鉴权。
-- 只支持 T4 GPU（`--force-fp16`），TPU 留到 v2。
+- 支持两种 Colab 加速卡：**T4 GPU**（`--force-fp16`，默认）与 **TPU v5e1**（`bf16` + ComfyUI 设备补丁，实验档）。
+  TPU 模式固定 ComfyUI `v0.46.2`（补丁锚点验证版本），要求 kernel 不 import torch。
 - v1 只部署 `anima-base-v1.0`（+ Qwen3 TE + Qwen VAE），App 通过 `/anima/v1/info` 自动识别实际已装模型。
 
 ## 2. 配对格式
@@ -39,6 +40,7 @@ token 每次会话随机生成（`secrets.token_urlsafe(24)`），不写死、�
 {"ok":true,"comfy":true,"gateway":"0.1.0","queue":{"running":0,"pending":0},
  "device":"Tesla T4","vram_total_gb":14.6}
 ```
+TPU 模式返回 `"device":"TPU v5e1"`（网关把 ComfyUI 的 `tpu` 映射成可读名）。
 - 不带 token 也返回 200（健康检查），但**不泄露模型/参数信息**；带上 token 时 `comfy` 才反映真实就绪状态。App 每次打开/测试连接先调它。
 - ComfyUI 未就绪时 `{"ok":true,"comfy":false,...}`。
 
@@ -130,7 +132,7 @@ App 用 unets 匹配模型注册表；用 defaults 填默认值。
 ```
 并把节点 7 的 `model` 改成 `["10",0]`。batch_size>1 时其余节点不变（ComfyUI 一次出多张）。
 
-校验过：ComfyUI 0.43.0 + Anima base 用这个图能出图（与 comfy-colab skill 的 run_anima.py 一致）。
+校验过：ComfyUI 0.43.0+ + Anima base 用这个图能出图（与 comfy-colab skill 的 run_anima.py 一致）；TPU 模式固定 ComfyUI v0.46.2。
 
 ## 6. 数据资产 schema（App assets/）
 
@@ -183,7 +185,9 @@ App 里用户保存的自定义模板存本地（不进 assets）。
 
 1. 手机浏览器 / Colab App 打开 →「全部运行」即可，无需键入命令。
 2. 幂等：重复运行不重下已存在模型、不重复 git clone。
-3. 顺序：装 ComfyUI → 下 base 模型/TE/VAE（`curl -C -` + `.part`）→ 起 ComfyUI（`nohup ... --listen 127.0.0.1 --port 8188 --force-fp16`）→ 起网关（token）→ 起 cloudflared quick tunnel → 解析 URL → 打印 `PAIR:` 行。
+3. 顺序：检查运行时（`nvidia-smi` → T4；`torch_tpu`/TPU 环境变量 → TPU v5e1）→ 装 ComfyUI → 下 base 模型/TE/VAE（`curl -C -` + `.part`）→ 起 ComfyUI → 起网关（token）→ 起 cloudflared quick tunnel → 解析 URL → 打印 `PAIR:` 行。
+   - T4：`--force-fp16`。
+   - TPU：先给 `comfy/model_management.py` 打 11 处设备/bf16/sync 补丁（幂等），再用 `--bf16-unet` 启动；依赖安装跳过 `torch/torchvision/torchaudio`。
 4. 下载大文件/安装期间要有进度输出，`colab exec` 长任务可超时但 VM 继续；重跑可续。
 5. 最后保活 cell：无限循环 `time.sleep` 打印心跳，保持 kernel 活跃（免费版 90 分钟闲置回收；免费额度仍有单次会话上限）。
 6. 失败时输出明确原因（torch 不可用 / 下载失败 / 端口占用 / cloudflared 缺失）与重跑方式。
@@ -196,10 +200,15 @@ App 不再依赖用户手动运行 notebook：服务端逻辑变成一份可在 
 
 1. OAuth：google-colab-cli 的 installed-app client + PKCE；授权码换 token，refresh_token 自动刷新。
 2. `GET https://colab.research.google.com/tun/m/assignments?authuser=0` 列出会话。
-3. 无会话则 `GET/POST /tun/m/assign?nbh=<web-safe-base64-uuid>&variant=GPU&accelerator=T4&authuser=0`（POST 头 `X-Goog-Colab-Token`）。
+3. 无会话则按设置页选择的加速卡申请：
+   - T4：`GET/POST /tun/m/assign?nbh=<web-safe-base64-uuid>&variant=GPU&accelerator=T4&authuser=0`
+   - TPU v5e1：`GET/POST /tun/m/assign?nbh=<web-safe-base64-uuid>&variant=TPU&accelerator=V5E1&authuser=0`
+   （POST 头 `X-Goog-Colab-Token`；复用已有会话时 `accelerator`+`variant` 必须匹配。）
 4. `runtimeProxyInfo` 给 `url` + `token`；`POST {url}/api/kernels {"name":"python3","path":null}` 建 kernel。
 5. `wss://{host}/api/kernels/{id}/channels?session_id=<hex32>&token=<proxyToken>`，Jupyter default 协议（JSON 文本帧，含 `channel` 字段），
    `execute_request` 执行部署脚本，流式收 stdout；同时收 `execute_reply` + `iopub idle` 判定结束。
+   App 会在脚本前注入 `ANIMA_ACCELERATOR=t4|tpu`；运行时类型与请求不一致时脚本快速失败。
+   TPU 模式必须新建 kernel（不复用 import 过 torch 的 kernel），否则 libtpu 会被 kernel 占住。
 6. 从输出正则解析 `PAIR: <url>|<token>` → 走 §3/§4 原配对接口连网关。
 7. 保活：Ready 状态下每 4 分钟执行一次 `print('[app] keepalive')`；停止时删 kernel + `unassign`。
 

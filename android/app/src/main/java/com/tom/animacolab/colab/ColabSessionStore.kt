@@ -39,6 +39,12 @@ class ColabSessionStore(context: Context) {
         get() = sp.getLong("started_at", 0L)
         set(v) = sp.edit().putLong("started_at", v).apply()
 
+    /** 用户选择的加速卡（T4 / TPU v5e1），下次一键启动沿用。 */
+    var accelerator: String
+        get() = sp.getString("accelerator", ColabAccelerator.T4.id).orEmpty()
+            .ifBlank { ColabAccelerator.T4.id }
+        set(v) = sp.edit().putString("accelerator", v).apply()
+
     val hasSession: Boolean get() = endpoint.isNotBlank()
 
     val hasPair: Boolean get() = pairUrl.isNotBlank() && pairToken.isNotBlank()
@@ -46,5 +52,9 @@ class ColabSessionStore(context: Context) {
     fun existingPair(): Pairing.Pair? =
         if (hasPair) Pairing.Pair(pairUrl, pairToken) else null
 
-    fun clear() = sp.edit().clear().apply()
+    /** 清空一次会话状态，但保留用户选中的加速卡（下次启动沿用）。 */
+    fun clear() {
+        val selected = accelerator
+        sp.edit().clear().putString("accelerator", selected).apply()
+    }
 }

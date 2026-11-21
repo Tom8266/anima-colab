@@ -201,3 +201,106 @@ PNG magic 正确，尺寸 1024×1024。说明「App → tunnel → 网关 → Co
 - 免费会话预计 1-3 小时上限，掉线后重跑一键流程（`/content` 会重新下载模型，约 3.5 分钟）
   会生成新 PAIR。
 - 未做：`colab stop` 由 Lead 收尾释放；服务端队友保持待命，随时可重新部署/热更新网关。
+
+## 9. TPU v5e1 实测补充（2026-11-21）
+
+> 目的：验证新增的 TPU 档位（bf16 + ComfyUI 设备补丁）不是纸面功能。
+> 环境：本机 Fedora + colab CLI 0.7.5 + `HTTPS_PROXY=http://127.0.0.1:7890`，
+> 同一个免费 Google 账号，`colab new --tpu v5e1 -s anima-tpu`。
+
+### 9.1 环境
+
+| 项目 | 值 |
+|---|---|
+| 会话 | `anima-tpu` / Hardware **TPU v5e1** |
+| 镜像 | Python 3.13.18 / torch **2.14.1+cpu** / torch_tpu 0.2.0 |
+| ComfyUI | **v0.46.2**（TPU 模式固定 tag；11 处设备补丁） |
+| 磁盘 | /content 225.3 GB 可用 |
+| 启动参数 | `--bf16-unet`（不是 `--force-fp16`） |
+| 网关自报 | `device=TPU v5e1` / `vram_total_gb=15.7` |
+
+### 9.2 冷启动部署（`colab exec -f colab/deploy_script.py`）
+
+真实耗时：07:29:09 开始，07:31:44 打印 PAIR，**共 2 分 35 秒**。
+
+| 阶段 | 耗时 |
+|---|---|
+| 环境检查（nvidia-smi 不在 → torch_tpu/TPU 环境变量命中） | <1s |
+| git clone `v0.46.2`（depth 1） | 2s |
+| pip install（TPU 过滤 torch/torchvision/torchaudio） | 41s |
+| 下载 3 个模型（5.3GB） | 50s |
+| 打 11 处 TPU 补丁 + ComfyUI 启动到 `/object_info` 200 | 24s |
+| 网关启动 + 本地 health comfy=true | 2s |
+| cloudflared 下载 + 公网 health 可达 | 36s |
+
+关键日志（节选）：
+
+```
+[deploy] 设备: TPU v5e1（bf16；TPU 只归一个进程）
+[deploy] + git clone --depth 1 --branch v0.46.2 ...
+[deploy] 已给 comfy/model_management.py 打上 11 处 TPU 设备补丁
+[deploy] ComfyUI 计算设备: tpu
+[deploy] 网关已就绪: http://127.0.0.1:8081（TPU v5e1）
+PAIR: https://passengers-jewellery-socket-outer.trycloudflare.com|<token>
+```
+
+### 9.3 幂等热重启
+
+修改网关注释后重跑同一脚本：
+
+- ComfyUI 已在运行 → 跳过启动；模型/依赖全部跳过；
+- 网关源码 sha256 变化 → 重启网关（2s）；
+- 复用原隧道与原 token，PAIR 不变；
+- 全流程 07:34:01 → 07:34:05，**4 秒**。
+
+### 9.4 契约 §8 验收（19/19 PASS）
+
+命令：
+
+```bash
+python3 colab/e2e_check.py --pair '<PAIR>' --out-dir outputs \
+        --seed 777021 --proxy http://127.0.0.1:7890
+```
+
+| 检查 | 结果 |
+|---|---|
+| health（免 token / 带 token） | PASS，`device='TPU v5e1'`，`vram=15.7` |
+| info / samplers | PASS，base + 默认 VAE/TE 正确 |
+| prompt → WS progress 30 帧 → executed | PASS |
+| history 参数精确匹配（30 步 / CFG 4.5 / 1024²） | PASS |
+| `/view` PNG | PASS，595,122 bytes，PNG magic 正确 |
+| 401 / 404 错误契约 | PASS |
+| **合计** | **19 checks, 0 failed** |
+
+证据：`outputs/e2e_20261121-153151_result.json` 与同名前缀 PNG（outputs/ gitignored）。
+
+### 9.5 App 一键模式（真机）
+
+- App 设置页选 **TPU v5e1** → 点「一键启动 Colab TPU」：
+  UI 依次显示「准备中 → 分配 TPU v5e1 并创建 Jupyter kernel → 部署中 → 已就绪」。
+- 复用 CLI 已部署的 TPU 会话：App 新建 kernel、注入 `ANIMA_ACCELERATOR=tpu`、
+  执行部署脚本；ComfyUI/模型/隧道全部跳过，几秒完成并自动配对。
+- Ready 页显示 `TPU v5e1 · 15.7G · 队列 0`；真机出图 1080×2400 / 30 步成功：
+  `animacolab_00001_.png`，1,763,157 bytes，PNG 1080×2400。
+- 首张 1080×2400 耗时约 5m30s（新 shape JIT 编译 + 2.59MP；之后换回 1024² 会再编译一次）。
+  这与参考文档「换分辨率会重新编译，首图明显慢」一致。
+- 停止会话后 App 回到「未启动」，且**保留 TPU 选择**；`colab sessions` 确认会话已释放。
+
+### 9.6 复现
+
+```bash
+# 1) TPU 会话（免费账号 v5e1；v6e1 通常无配额）
+colab new --tpu v5e1 -s anima-tpu
+
+# 2) 部署（幂等；日志会打印 PAIR）
+colab exec -s anima-tpu --timeout 1800 -f colab/deploy_script.py
+
+# 3) 契约验收
+python3 colab/e2e_check.py --pair '<PAIR>' --out-dir outputs \
+        --seed 777021 --proxy http://127.0.0.1:7890
+
+# 4) App：设置 → 运行设备选 TPU v5e1 → 一键启动
+
+# 5) 释放
+colab stop -s anima-tpu
+```

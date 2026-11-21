@@ -42,6 +42,7 @@ import androidx.compose.material.icons.outlined.NotificationsActive
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.RocketLaunch
+import androidx.compose.material.icons.outlined.Speed
 import androidx.compose.material.icons.outlined.StopCircle
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
@@ -82,6 +83,7 @@ import androidx.compose.ui.unit.sp
 import com.tom.animacolab.AppViewModel
 import com.tom.animacolab.BuildConfig
 import com.tom.animacolab.UiState
+import com.tom.animacolab.colab.ColabAccelerator
 import com.tom.animacolab.colab.ColabSessionManager
 import com.tom.animacolab.data.ConnectionState
 import com.tom.animacolab.data.ThemeMode
@@ -149,7 +151,11 @@ private data class HeroState(val label: String, val tone: StatusTone, val subtit
 
 private fun heroState(state: UiState): HeroState {
     if (!state.googleLoggedIn) {
-        return HeroState("未登录", StatusTone.Neutral, "登录后自动创建 T4 并完成配对")
+        return HeroState(
+            "未登录",
+            StatusTone.Neutral,
+            "登录后自动创建 ${state.colabAccelerator.shortLabel} 并完成配对",
+        )
     }
     return when (val session = state.session) {
         ColabSessionManager.State.Starting ->
@@ -162,14 +168,81 @@ private fun heroState(state: UiState): HeroState {
             HeroState(
                 "已就绪",
                 StatusTone.Success,
-                "${session.device.ifBlank { "T4" }} · 已运行 ${elapsedMinutes(session.startedAtMs)} 分钟",
+                "${session.device.ifBlank { state.colabAccelerator.label }} · " +
+                    "已运行 ${elapsedMinutes(session.startedAtMs)} 分钟",
             )
 
         is ColabSessionManager.State.Failed ->
             HeroState("启动失败", StatusTone.Error, "上次启动失败，可重试")
 
         ColabSessionManager.State.Off ->
-            HeroState("未启动", StatusTone.Neutral, "自动创建 T4 并完成配对")
+            HeroState(
+                "未启动",
+                StatusTone.Neutral,
+                "自动创建 ${state.colabAccelerator.shortLabel} 并完成配对",
+            )
+    }
+}
+
+/**
+ * 加速卡选择：只在未启动/失败时出现，Ready 后设备信息在 Hero 卡里展示。
+ * T4 是稳定默认；TPU v5e1 是实验档，首次部署会打 ComfyUI 设备补丁。
+ */
+@Composable
+private fun AcceleratorCard(
+    selected: ColabAccelerator,
+    onSelect: (ColabAccelerator) -> Unit,
+) {
+    ExpressiveCard(modifier = Modifier.animateContentSize()) {
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.tertiaryContainer),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Outlined.Speed,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+            Spacer(Modifier.width(Spacing.md))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    "运行设备",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Text(
+                    "一键启动时申请哪种 Colab 加速卡",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        Spacer(Modifier.height(Spacing.md))
+        SegmentedOptions(
+            options = ColabAccelerator.entries.map { it.label },
+            selectedIndex = selected.ordinal,
+            onSelect = { onSelect(ColabAccelerator.entries[it]) },
+        )
+        Spacer(Modifier.height(Spacing.sm))
+        Text(
+            selected.summary,
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.primary,
+            lineHeight = 18.sp,
+        )
+        Spacer(Modifier.height(Spacing.xs))
+        Text(
+            selected.detail,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            lineHeight = 16.sp,
+        )
     }
 }
 
@@ -185,6 +258,12 @@ private fun ColabSection(vm: AppViewModel, state: UiState) {
     val hero = heroState(state)
 
     SectionLabel("Colab 一键启动")
+    if (state.session is ColabSessionManager.State.Off ||
+        state.session is ColabSessionManager.State.Failed
+    ) {
+        AcceleratorCard(state.colabAccelerator, onSelect = vm::setColabAccelerator)
+        Spacer(Modifier.height(Spacing.md))
+    }
     ExpressiveCard(shape = AnimaShape.hero, containerColor = container, contentColor = onContainer) {
         Box(Modifier.fillMaxWidth()) {
             // 这里不放装饰形状：卡片右上角是状态 pill，下面是「退出登录」，
@@ -210,7 +289,7 @@ private fun ColabSection(vm: AppViewModel, state: UiState) {
                     // 胶囊只和标题同行，副标题独占整行 → 不会被挤压断词。
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            "Colab T4",
+                            "Colab ${state.colabAccelerator.shortLabel}",
                             style = MaterialTheme.typography.titleMediumEmphasized,
                             color = onContainer,
                             modifier = Modifier.weight(1f),
@@ -230,16 +309,16 @@ private fun ColabSection(vm: AppViewModel, state: UiState) {
         Spacer(Modifier.height(Spacing.lg))
 
         if (!state.googleLoggedIn) {
-            LoggedOutBody(vm = vm, quiet = quiet)
+            LoggedOutBody(vm = vm, quiet = quiet, accelerator = state.colabAccelerator)
         } else {
             GoogleAccountRow(vm = vm, onLogoutClick = { confirmLogout = true })
             Spacer(Modifier.height(Spacing.md))
             when (val session = state.session) {
-                ColabSessionManager.State.Starting -> StartingBody(vm)
+                ColabSessionManager.State.Starting -> StartingBody(vm, state.colabAccelerator)
                 is ColabSessionManager.State.Deploying -> DeployingBody(vm, session)
                 is ColabSessionManager.State.Ready -> ReadyBody(vm, state, session, onStopClick = { confirmStop = true })
                 is ColabSessionManager.State.Failed -> FailedBody(vm, session)
-                ColabSessionManager.State.Off -> OffBody(vm)
+                ColabSessionManager.State.Off -> OffBody(vm, state.colabAccelerator)
             }
             val deploying = state.session is ColabSessionManager.State.Deploying
             val failed = state.session is ColabSessionManager.State.Failed
@@ -257,7 +336,8 @@ private fun ColabSection(vm: AppViewModel, state: UiState) {
     if (confirmStop) {
         ConfirmDialog(
             title = "停止 Colab 会话？",
-            text = "会立即释放当前 T4 会话并清除自动配对；下次使用需要重新部署（首次约 3-5 分钟）。",
+            text = "会立即释放当前 ${state.colabAccelerator.label} 会话并清除自动配对；" +
+                "下次使用需要重新部署（首次约 3-5 分钟）。",
             confirmLabel = "停止会话",
             onConfirm = {
                 confirmStop = false
@@ -310,11 +390,11 @@ private fun GoogleAccountRow(vm: AppViewModel, onLogoutClick: () -> Unit) {
 
 /** 未登录：登录 Google + 粘贴授权码。 */
 @Composable
-private fun LoggedOutBody(vm: AppViewModel, quiet: Color) {
+private fun LoggedOutBody(vm: AppViewModel, quiet: Color, accelerator: ColabAccelerator) {
     var showLoginCode by rememberSaveable { mutableStateOf(false) }
     Text(
-        "登录 Google 后，App 会自动创建 Colab T4、部署 ComfyUI + Anima、自动完成配对，" +
-            "不用再打开 Colab 页面复制 PAIR。",
+        "登录 Google 后，App 会自动创建 Colab ${accelerator.shortLabel}、" +
+            "部署 ComfyUI + Anima、自动完成配对，不用再打开 Colab 页面复制 PAIR。",
         style = MaterialTheme.typography.bodySmall,
         color = quiet,
         lineHeight = 18.sp,
@@ -355,7 +435,7 @@ private fun LoggedOutBody(vm: AppViewModel, quiet: Color) {
 /** Starting：分配会话中，可取消。 */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-private fun StartingBody(vm: AppViewModel) {
+private fun StartingBody(vm: AppViewModel, accelerator: ColabAccelerator) {
     val onContainer = MaterialTheme.colorScheme.onPrimaryContainer
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         ContainedLoadingIndicator(
@@ -371,7 +451,7 @@ private fun StartingBody(vm: AppViewModel) {
                 color = onContainer,
             )
             Text(
-                "分配 T4 并创建 Jupyter kernel",
+                "分配 ${accelerator.label} 并创建 Jupyter kernel",
                 style = MaterialTheme.typography.labelSmall,
                 color = onContainer.copy(alpha = 0.76f),
             )
@@ -437,14 +517,17 @@ private fun ReadyBody(
         )
         Spacer(Modifier.width(Spacing.sm))
         Text(
-            "T4 已就绪 · 已运行 ${elapsedMinutes(session.startedAtMs)} 分钟",
+            "${session.device.ifBlank { "Colab" }} 已就绪 · 已运行 ${elapsedMinutes(session.startedAtMs)} 分钟",
             style = MaterialTheme.typography.bodyMedium,
             color = onContainer,
             modifier = Modifier.weight(1f),
         )
     }
     Spacer(Modifier.height(Spacing.sm))
-    HeroInfoRow("设备", session.device.ifBlank { state.info?.device ?: "T4" })
+    HeroInfoRow(
+        "设备",
+        session.device.ifBlank { state.info?.device ?: state.colabAccelerator.label },
+    )
     HeroInfoRow("显存", vramText(state))
     HeroInfoRow("队列", "运行 ${state.serverQueue.running} / 排队 ${state.serverQueue.pending}")
     Spacer(Modifier.height(Spacing.md))
@@ -528,17 +611,21 @@ private fun FailedBody(vm: AppViewModel, session: ColabSessionManager.State.Fail
 
 /** Off：主操作一键启动。 */
 @Composable
-private fun OffBody(vm: AppViewModel) {
+private fun OffBody(vm: AppViewModel, accelerator: ColabAccelerator) {
     val quiet = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.76f)
     PrimaryActionButton(
-        text = "一键启动 Colab T4",
+        text = "一键启动 Colab ${accelerator.shortLabel}",
         onClick = vm::startColabSession,
         modifier = Modifier.fillMaxWidth(),
         icon = Icons.Outlined.RocketLaunch,
     )
     Spacer(Modifier.height(Spacing.sm))
     Text(
-        "首次约 3-5 分钟（下载 5.3GB 模型）；同一会话里再启动几秒就能完成。",
+        if (accelerator.isTpu) {
+            "首次约 4-6 分钟（下载 5.3GB 模型 + TPU 补丁）；首张图还会先编译约 1 分钟。"
+        } else {
+            "首次约 3-5 分钟（下载 5.3GB 模型）；同一会话里再启动几秒就能完成。"
+        },
         style = MaterialTheme.typography.labelSmall,
         color = quiet,
         lineHeight = 16.sp,
@@ -867,7 +954,7 @@ private fun ServerSection(vm: AppViewModel, state: UiState) {
                 )
             }
         } else {
-            InfoRow("设备", info.device ?: "T4")
+            InfoRow("设备", info.device ?: state.colabAccelerator.label)
             InfoRow("显存", vramText(state))
             InfoRow("队列", "运行 ${state.serverQueue.running} / 排队 ${state.serverQueue.pending}")
             InfoRow("模型", info.unets.joinToString(", ").ifBlank { "—" })
@@ -918,7 +1005,7 @@ private fun UsageSection(onExportNotebook: () -> Unit) {
                 Spacer(Modifier.height(Spacing.xs))
                 HelpBody(
                     "1. 点「登录 Google」完成一次授权。\n" +
-                        "2. 点「一键启动 Colab T4」，App 自动创建会话、部署 ComfyUI + Anima、自动配对（首次 3-5 分钟）。\n" +
+                        "2. 点「一键启动 Colab」，App 自动创建会话、部署 ComfyUI + Anima、自动配对（首次 3-5 分钟）。\n" +
                         "3. 回生成页出图；App 每 4 分钟自动保活。\n" +
                         "4. 不用时点「停止会话」释放（也可以直接放着，Colab 到时会自动回收）。",
                 )
@@ -932,6 +1019,7 @@ private fun UsageSection(onExportNotebook: () -> Unit) {
                 HelpBody(
                     "· App 访问 Google 需要手机能上 Google（开代理 / VPN）。\n" +
                         "· 免费 Colab 单会话有时长和额度上限；断开后点「一键启动」会重新申请并部署（/content 清空后要重下模型）。\n" +
+                        "· TPU v5e1 是实验档：部署时会打 ComfyUI 设备补丁，首图需编译；比 T4 快约 2 倍。\n" +
                         "· Colab 内容政策：只跑正常内容。",
                 )
             }
@@ -994,7 +1082,8 @@ private fun AboutSection() {
         )
         Spacer(Modifier.height(Spacing.xs))
         Text(
-            "Anima 2B（Cosmos-Predict2 架构）+ Qwen3-0.6B 文本编码器 + Qwen-Image VAE，在 Colab T4 上以 fp16 运行。" +
+            "Anima 2B（Cosmos-Predict2 架构）+ Qwen3-0.6B 文本编码器 + Qwen-Image VAE。" +
+                "T4 用 fp16，TPU v5e1 用 bf16（需给 ComfyUI 打设备补丁）。" +
                 "一键模式的 Colab 协议（OAuth / assignments / Jupyter kernel）移植自 Google 开源的 google-colab-cli。",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -1136,7 +1225,8 @@ private fun serverSummaryText(state: UiState): String {
     val info = state.info ?: return "未连接"
     val device = info.device.orEmpty()
     val vram = info.vramTotalGb?.let { "%.1fG".format(java.util.Locale.US, it) }.orEmpty()
-    return listOf(device, vram).filter { it.isNotBlank() }.joinToString(" · ").ifBlank { "T4" }
+    return listOf(device, vram).filter { it.isNotBlank() }.joinToString(" · ")
+        .ifBlank { state.colabAccelerator.shortLabel }
 }
 
 private fun elapsedMinutes(startedAtMs: Long): Long {

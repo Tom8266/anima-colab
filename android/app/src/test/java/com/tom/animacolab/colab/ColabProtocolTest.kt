@@ -138,9 +138,24 @@ class ColabProtocolTest {
     }
 
     @Test
-    fun buildsAssignUrlWithCustomAccelerator() {
+    fun buildsAssignUrlForTpu() {
         val api = ColabApi(accessToken = { "token" })
-        assertTrue(api.assignUrl("abc", accelerator = "L4").contains("accelerator=L4"))
+        val url = api.assignUrl("abc", ColabAccelerator.TPU_V5E1)
+        assertTrue(url.contains("variant=TPU"))
+        assertTrue(url.contains("accelerator=V5E1"))
+    }
+
+    @Test
+    fun acceleratorMatchingUsesNameAndVariant() {
+        assertTrue(ColabAccelerator.T4.matches("T4", 1))
+        assertTrue(ColabAccelerator.T4.matches("t4", null))
+        assertFalse(ColabAccelerator.T4.matches("V5E1", 2))
+        assertTrue(ColabAccelerator.TPU_V5E1.matches("V5E1", 2))
+        assertFalse(ColabAccelerator.TPU_V5E1.matches("V5E1", 1))
+        assertEquals(ColabAccelerator.TPU_V5E1, ColabAccelerator.fromId("tpu-v5e1"))
+        assertEquals(ColabAccelerator.T4, ColabAccelerator.fromId("???"))
+        assertEquals(ColabAccelerator.TPU_V5E1, ColabAccelerator.fromApi("V5E1", 2))
+        assertNull(ColabAccelerator.fromApi("T4", 2))
     }
 
     @Test

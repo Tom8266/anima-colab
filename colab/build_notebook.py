@@ -13,9 +13,16 @@ OUT = ROOT / "colab" / "anima_colab.ipynb"
 gateway_source = (ROOT / "colab" / "gateway.py").read_text(encoding="utf-8")
 assert "'''" not in gateway_source, "gateway.py must not contain triple single quotes"
 
-MD_INTRO = r"""# Anima on Colab T4（手机独立方案服务端）
+MD_INTRO = r"""# Anima on Colab T4 / TPU v5e1（手机独立方案服务端）
 
-一键在 **免费 Colab T4** 上部署：ComfyUI（只装 Anima base）+ token 鉴权网关 + Cloudflare 快速隧道。
+一键在 **免费 Colab** 上部署：ComfyUI（只装 Anima base）+ token 鉴权网关 + Cloudflare 快速隧道。
+支持两种运行时：
+
+| 运行时 | 精度 | 速度（1024² / 30 步） | 说明 |
+|---|---|---|---|
+| **T4 GPU**（默认） | fp16 | 约 70–90 秒 | 稳定档，`--force-fp16` |
+| **TPU v5e1**（实验） | bf16 | 约 36 秒，首图多约 1 分钟编译 | 自动给 ComfyUI 打设备补丁 |
+
 部署完成后会打印一行给你手机 App 用的配对信息：
 
 ```
@@ -24,7 +31,7 @@ PAIR: https://xxxx-xxxx.trycloudflare.com|<随机 token>
 
 ## 使用方法
 
-1. 确认「运行时 → 更改运行时类型」是 **T4 GPU**（免费版即可）。
+1. 「运行时 → 更改运行时类型」选择 **T4 GPU** 或 **TPU v5e1**（免费账号可用；v6e1 通常没有配额）。
 2. 点菜单 **运行时 → 全部运行**（或 `Ctrl+F9`），等待 8-15 分钟（首次下载模型约 5.3GB）。
 3. 到最后会打印醒目输出块：长按复制 `PAIR:` 那一整行。
 4. 打开 Anima App → 设置 → 粘贴配对信息 → 保存 → 测试连接 → 生成图片。
@@ -34,6 +41,9 @@ PAIR: https://xxxx-xxxx.trycloudflare.com|<随机 token>
 - 只下载 `anima-base-v1.0`（3.9G）+ Qwen3 文本编码器（1.2G）+ Qwen VAE（243M），不装其它模型。
 - 笔记本可重复运行（幂等）：已存在的 ComfyUI / 模型 / 隧道 / token 都会复用，不重复下载。
 - 下载中途断掉也安全：`.part` 文件会续传，重跑对应 cell 即可。
+- **TPU 模式**：部署脚本会给 ComfyUI 打 11 处 TPU 设备补丁，并固定到验证过的版本
+  `v0.46.2`；Jupyter kernel 不能 import torch（会占住 TPU），请从新打开的 notebook 直接 Run all。
+  若日志出现 `TPU is already in use`，用「运行时 → 断开并删除运行时」清掉进程后重试。
 - **建议**：`文件 → 保存副本` 保存到 Google Drive，下次直接打开 Run all，不用重新找链接。
 - 免费 Colab 会话有效期 1-3 小时（受额度限制），断线后重跑会生成新的 PAIR，App 需重新粘贴。
 - 服务端仅在 VM 内运行；token 每次新会话随机生成。请只生成合规内容（遵守 Colab 内容政策）。
@@ -43,11 +53,14 @@ MD_STEPS = r"""## 部署步骤（全部运行即可，无需改代码）
 
 | 步骤 | 内容 | 首次耗时 |
 |---|---|---|
-| 1 | 环境检查（T4 / 磁盘） | 秒级 |
+| 1 | 环境检查（T4 / TPU v5e1 / 磁盘） | 秒级 |
 | 2 | 克隆 ComfyUI + 安装依赖 + 下载 3 个模型文件（5.3GB） | 5-10 分钟 |
-| 3 | 启动 ComfyUI（127.0.0.1:8188，`--force-fp16`） | 20-40 秒 |
+| 3 | 启动 ComfyUI（T4 `--force-fp16`；TPU 打补丁 + `--bf16-unet`） | 20-60 秒 |
 | 4 | 启动 token 网关（127.0.0.1:8081） | 2 秒 |
 | 5 | 启动 cloudflared 快速隧道并打印 `PAIR` | 10-40 秒 |
+
+**TPU 三条硬约束**：① TPU 只归一个进程，kernel 里不能 import torch；
+② 精度只能用 bf16，不能用 `--force-fp16`；③ 换分辨率会触发重新编译，首图明显慢。
 
 最后的「保活」cell 会一直循环打印心跳，这是正常的——它让免费会话不被判定闲置。
 """
@@ -55,6 +68,7 @@ MD_STEPS = r"""## 部署步骤（全部运行即可，无需改代码）
 CODE_HELPERS = r'''# =============================================================================
 # 步骤 0：公共配置与工具函数（Run all 时最先执行，不要单独跳过）
 # =============================================================================
+import importlib.util
 import json
 import os
 import re
@@ -78,6 +92,10 @@ GATEWAY_LOG = CONTENT / "gateway.log"
 TUNNEL_LOG = CONTENT / "cloudflared.log"
 CLOUDFLARED = CONTENT / "cloudflared"
 GATEWAY_PY = CONTENT / "anima_gateway.py"
+
+# TPU 设备补丁的锚点按这个版本验证；TPU 模式固定使用它，避免上游改代码后补丁打歪。
+# 升级 ComfyUI 前先重测 11 处补丁（复现命令见 colab/README.md）。
+COMFY_TPU_TAG = "v0.46.2"
 
 HF_FILES = "https://huggingface.co/circlestone-labs/Anima/resolve/main/split_files"
 MODELS = [
@@ -187,41 +205,99 @@ def kill_matching(pattern):
 '''
 
 CODE_ENV = r'''# =============================================================================
-# 步骤 1/4：环境检查（必须是 GPU 运行时；免费版选 T4）
+# 步骤 1/4：环境检查（T4 GPU 或 TPU v5e1）
 # =============================================================================
 print("=" * 70)
-print("步骤 1/4：检查 Colab 运行环境（需要 GPU / T4）")
+print("步骤 1/4：检查 Colab 运行环境（T4 GPU / TPU v5e1）")
 print("=" * 70)
 
 
-def gpu_info():
-    # Deliberately avoid importing torch in the kernel: nvidia-smi is enough,
-    # so the App's deploy kernel keeps a small memory footprint.
+def _module_installed(name):
+    try:
+        return importlib.util.find_spec(name) is not None
+    except (ImportError, ValueError):
+        return False
+
+
+def _nvidia_gpu():
+    """返回 (name, vram_gb)；没有 GPU 时返回 None。不 import torch。"""
     try:
         proc = subprocess.run(
             ["nvidia-smi", "--query-gpu=name,memory.total",
              "--format=csv,noheader,nounits"],
             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=15,
         )
-    except (OSError, subprocess.SubprocessError) as exc:
-        raise RuntimeError(
-            "nvidia-smi 不可用（%r）。请确认「运行时 → 更改运行时类型」选择 GPU（T4），"
-            "然后重新运行。" % (exc,)
-        )
+    except (OSError, subprocess.SubprocessError):
+        return None
     if proc.returncode != 0 or not proc.stdout.strip():
-        raise RuntimeError(
-            "没有检测到 GPU（nvidia-smi 失败：%s）。当前运行时不是 GPU 运行时，"
-            "请在「运行时 → 更改运行时类型 → T4 GPU」后重试。"
-            % (proc.stderr or "").strip()[:300]
-        )
+        return None
     parts = [part.strip() for part in proc.stdout.strip().splitlines()[0].split(",")]
-    return parts[0], float(parts[1]) / 1024.0
+    try:
+        return parts[0], float(parts[1]) / 1024.0
+    except (IndexError, ValueError):
+        return None
 
 
-gpu_name, vram_gb = gpu_info()
-log("GPU: %s / 显存 %.1f GB" % (gpu_name, vram_gb))
-if "T4" not in gpu_name:
-    log("提示: 本方案只针对 T4 验证过（--force-fp16），其它 GPU 可能也能跑。")
+def _tpu_present():
+    # 不 import torch：torch_tpu 只查模块元数据；Colab TPU 还会设这些环境变量。
+    if _module_installed("torch_tpu"):
+        return True
+    return any(os.environ.get(key) for key in (
+        "TPU_NAME", "TPU_WORKER_ID", "COLAB_TPU_ADDR", "LIBTPU_INIT_ARGS",
+    ))
+
+
+def _kernel_has_libtpu():
+    """kernel 自己 import 过 torch 会映射 libtpu.so，之后 ComfyUI 抢不到 TPU。"""
+    try:
+        maps = Path("/proc/self/maps").read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return False
+    return "libtpu" in maps
+
+
+def detect_accelerator():
+    override = os.environ.get("ANIMA_ACCELERATOR", "").strip().lower()
+    if override not in ("", "auto", "t4", "tpu"):
+        raise RuntimeError("ANIMA_ACCELERATOR 只能是 t4 / tpu / auto，实际：%r" % override)
+    gpu = _nvidia_gpu()
+    tpu = _tpu_present()
+    if override == "t4":
+        if gpu is None:
+            raise RuntimeError(
+                "App 请求 T4，但当前运行时没有 GPU。"
+                "请「运行时 → 更改运行时类型 → T4 GPU」后重试。"
+            )
+        return "t4", gpu[0], gpu[1]
+    if override == "tpu":
+        if not tpu:
+            raise RuntimeError(
+                "App 请求 TPU，但当前运行时不是 TPU（找不到 torch_tpu / TPU 环境变量）。"
+                "请「运行时 → 更改运行时类型 → TPU v5e1」后重试。"
+            )
+        return "tpu", "TPU v5e1", 16.0
+    if gpu is not None:
+        return "t4", gpu[0], gpu[1]
+    if tpu:
+        return "tpu", "TPU v5e1", 16.0
+    raise RuntimeError(
+        "没有检测到加速卡：既没有 nvidia-smi（GPU），也没有 torch_tpu/TPU 环境变量。"
+        "请在「运行时 → 更改运行时类型」选择 T4 GPU 或 TPU v5e1。"
+    )
+
+
+ACCELERATOR, DEVICE_LABEL, VRAM_GB = detect_accelerator()
+if ACCELERATOR == "tpu":
+    log("设备: %s（bf16；TPU 只归一个进程）" % DEVICE_LABEL)
+    if _kernel_has_libtpu():
+        raise RuntimeError(
+            "当前 kernel 已加载 libtpu（torch 被 import 过），ComfyUI 会报 "
+            "「TPU is already in use」。请「运行时 → 断开并删除运行时」后重新 Run all。"
+        )
+else:
+    log("GPU: %s / 显存 %.1f GB" % (DEVICE_LABEL, VRAM_GB))
+    if "T4" not in DEVICE_LABEL:
+        log("提示: T4 是验证过的档位；其它 GPU 用 fp16 通常也能跑。")
 
 usage = shutil.disk_usage(CONTENT)
 log("磁盘 /content: 共 %.1f GB，可用 %.1f GB" % (usage.total / 1024 ** 3, usage.free / 1024 ** 3))
@@ -230,7 +306,7 @@ if usage.free < 12 * 1024 ** 3:
         "/content 可用空间不足 12GB（当前 %.1f GB）。请「运行时 → 重新启动运行时」后重试。"
         % (usage.free / 1024 ** 3)
     )
-log("环境检查通过")
+log("环境检查通过（%s）" % DEVICE_LABEL)
 '''
 
 CODE_CLONE = r'''# =============================================================================
@@ -240,19 +316,54 @@ print("=" * 70)
 print("步骤 2/4-A：安装 ComfyUI（git clone + pip 依赖）")
 print("=" * 70)
 
+
+def _comfy_version():
+    try:
+        text = (COMFY / "comfyui_version.py").read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return ""
+    match = re.search(r'__version__\s*=\s*"([^"]+)"', text)
+    return match.group(1) if match else ""
+
+
+TPU_REF_MARKER = COMFY / ".anima_tpu_ref"
+
+
+def _checkout_tpu_ref():
+    wanted = COMFY_TPU_TAG.lstrip("v")
+    current = _comfy_version()
+    marker = ""
+    try:
+        marker = TPU_REF_MARKER.read_text(encoding="utf-8").strip()
+    except OSError:
+        pass
+    if current == wanted and marker == COMFY_TPU_TAG:
+        log("ComfyUI 已固定在 TPU 验证版本 %s" % COMFY_TPU_TAG)
+        return
+    log("TPU 模式固定使用 ComfyUI %s（当前 %s），切换中…"
+        % (COMFY_TPU_TAG, current or "未知"))
+    run(["git", "-C", str(COMFY), "fetch", "--depth", "1",
+         "origin", "tag", COMFY_TPU_TAG], timeout=300)
+    run(["git", "-C", str(COMFY), "checkout", "-f", COMFY_TPU_TAG], timeout=120)
+    TPU_REF_MARKER.write_text(COMFY_TPU_TAG, encoding="utf-8")
+    log("ComfyUI 已切换到 %s" % COMFY_TPU_TAG)
+
+
 if (COMFY / "main.py").exists():
     log("ComfyUI 已存在，跳过 git clone: %s" % COMFY)
+    if ACCELERATOR == "tpu":
+        _checkout_tpu_ref()
 else:
     if COMFY.exists():
         shutil.rmtree(COMFY, ignore_errors=True)
     last_error = None
     for attempt in range(1, 4):
         try:
-            run(
-                ["git", "clone", "--depth", "1",
-                 "https://github.com/comfyanonymous/ComfyUI.git", str(COMFY)],
-                timeout=600,
-            )
+            command = ["git", "clone", "--depth", "1"]
+            if ACCELERATOR == "tpu":
+                command += ["--branch", COMFY_TPU_TAG]
+            command += ["https://github.com/comfyanonymous/ComfyUI.git", str(COMFY)]
+            run(command, timeout=600)
             last_error = None
             break
         except Exception as exc:
@@ -265,19 +376,51 @@ else:
             "git clone 连续 3 次失败（Colab 访问 GitHub 异常）。稍后重跑本 cell 即可：%r"
             % (last_error,)
         )
+    if ACCELERATOR == "tpu":
+        TPU_REF_MARKER.write_text(COMFY_TPU_TAG, encoding="utf-8")
     log("ComfyUI 克隆完成")
 
-deps_marker = COMFY / ".anima_deps_ok"
+
+def _write_tpu_requirements():
+    """TPU 镜像自带配对的 torch/torch_tpu，装 requirements 时必须跳过 torch 三件套。"""
+    kept = []
+    for line in (COMFY / "requirements.txt").read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            kept.append(line)
+            continue
+        pkg = re.split(r"[=<>!~\[ ;]", stripped)[0].lower()
+        if pkg in ("torch", "torchvision", "torchaudio"):
+            continue
+        kept.append(line)
+    path = CONTENT / "requirements_tpu.txt"
+    path.write_text("\n".join(kept) + "\n", encoding="utf-8")
+    return path
+
+
+deps_marker = COMFY / (".anima_deps_ok_tpu" if ACCELERATOR == "tpu" else ".anima_deps_ok")
+marker_value = ""
 if deps_marker.exists():
+    marker_value = deps_marker.read_text(encoding="utf-8", errors="replace").strip()
+deps_ready = deps_marker.exists() and (
+    ACCELERATOR != "tpu" or marker_value == COMFY_TPU_TAG
+)
+if deps_ready:
     log("Python 依赖已装过，跳过 pip install")
 else:
-    log("安装 ComfyUI 依赖（1-3 分钟，镜像自带 torch 不会重装）...")
+    if ACCELERATOR == "tpu":
+        log("安装 ComfyUI 依赖（TPU：跳过 torch/torchvision/torchaudio，保留镜像配对版本）...")
+        requirements = _write_tpu_requirements()
+    else:
+        log("安装 ComfyUI 依赖（1-3 分钟，镜像自带 torch 不会重装）...")
+        requirements = COMFY / "requirements.txt"
     run(
         [sys.executable, "-m", "pip", "install", "-q", "--no-input",
-         "-r", str(COMFY / "requirements.txt")],
+         "-r", str(requirements)],
         timeout=1200,
     )
-    deps_marker.write_text("ok", encoding="utf-8")
+    deps_marker.write_text(COMFY_TPU_TAG if ACCELERATOR == "tpu" else "ok",
+                           encoding="utf-8")
     log("依赖安装完成")
 
 try:
@@ -348,33 +491,196 @@ log("三个模型文件全部就绪（base 3.9G + TE 1.2G + VAE 243M）")
 '''
 
 CODE_COMFY = r'''# =============================================================================
-# 步骤 2/4-C：启动 ComfyUI（只监听 127.0.0.1:8188，--force-fp16）
+# 步骤 2/4-C：启动 ComfyUI（T4: --force-fp16 / TPU: 打设备补丁 + --bf16-unet）
 # =============================================================================
 print("=" * 70)
-print("步骤 2/4-C：启动 ComfyUI")
+print("步骤 2/4-C：启动 ComfyUI（%s）"
+      % ("TPU bf16" if ACCELERATOR == "tpu" else "T4 fp16"))
 print("=" * 70)
+
+TPU_HELPER = """def is_tpu():
+    return torch.accelerator.is_available() and torch.accelerator.current_accelerator().type == "tpu"
+
+"""
+
+TPU_PATCHES = [
+    # 设备选择
+    ("""def get_torch_device():
+    global cpu_state""",
+     TPU_HELPER + """def get_torch_device():
+    global cpu_state"""),
+    ("""        if is_intel_xpu():
+            return torch.device("xpu", torch.xpu.current_device())""",
+     """        if is_tpu():
+            return torch.device("tpu")
+        elif is_intel_xpu():
+            return torch.device("xpu", torch.xpu.current_device())"""),
+    ("""        elif is_intel_xpu():
+            for i in range(torch.xpu.device_count()):
+                devices.append(torch.device("xpu", i))""",
+     """        elif is_tpu():
+            for i in range(torch.accelerator.device_count()):
+                devices.append(torch.device("tpu", i))
+        elif is_intel_xpu():
+            for i in range(torch.xpu.device_count()):
+                devices.append(torch.device("xpu", i))"""),
+    # 显存统计
+    ("""        if is_intel_xpu():
+            stats = torch.xpu.memory_stats(dev)
+            mem_reserved = stats['reserved_bytes.all.current']
+            mem_total_xpu = torch.xpu.get_device_properties(dev).total_memory""",
+     """        if is_tpu():
+            mem_total_torch = torch.accelerator.memory_reserved()
+            _, mem_total = torch.accelerator.get_memory_info(dev)
+        elif is_intel_xpu():
+            stats = torch.xpu.memory_stats(dev)
+            mem_reserved = stats['reserved_bytes.all.current']
+            mem_total_xpu = torch.xpu.get_device_properties(dev).total_memory"""),
+    ("""        if is_intel_xpu():
+            stats = torch.xpu.memory_stats(dev)
+            mem_active = stats['active_bytes.all.current']""",
+     """        if is_tpu():
+            mem_active = torch.accelerator.memory_allocated()
+            mem_reserved = torch.accelerator.memory_reserved()
+            mem_free_tpu, _ = torch.accelerator.get_memory_info(dev)
+            mem_free_torch = mem_reserved - mem_active
+            mem_free_total = mem_free_tpu + mem_free_torch
+        elif is_intel_xpu():
+            stats = torch.xpu.memory_stats(dev)
+            mem_active = stats['active_bytes.all.current']"""),
+    # 设备名与切换（torch.tpu.* 是内部接口，用户代码直接调会抛错）
+    ("""        elif device.type == "xpu":
+            return "{} {}".format(device, torch.xpu.get_device_name(device))""",
+     """        elif device.type == "tpu":
+            return "{}".format(device.type)
+        elif device.type == "xpu":
+            return "{} {}".format(device, torch.xpu.get_device_name(device))"""),
+    ("""    if is_device_cuda(device):
+        torch.cuda.set_device(device)
+    elif is_device_xpu(device):
+        torch.xpu.set_device(device)""",
+     """    if is_tpu():
+        torch.accelerator.set_device_index(device)
+    elif is_device_cuda(device):
+        torch.cuda.set_device(device)
+    elif is_device_xpu(device):
+        torch.xpu.set_device(device)"""),
+    # 精度策略：TPU 只吃 bf16
+    ("""def should_use_fp16(device=None, model_params=0, prioritize_performance=True, manual_cast=False):
+    if device is not None:
+        if is_device_cpu(device):
+            return False
+""",
+     """def should_use_fp16(device=None, model_params=0, prioritize_performance=True, manual_cast=False):
+    if device is not None:
+        if is_device_cpu(device):
+            return False
+
+    if is_tpu():
+        return False
+"""),
+    ("""    if is_intel_xpu():
+        return torch.xpu.is_bf16_supported()""",
+     """    if is_tpu():
+        return True
+
+    if is_intel_xpu():
+        return torch.xpu.is_bf16_supported()"""),
+    # 同步与缓存
+    ("""def synchronize():
+    if cpu_mode():
+        return
+    if is_intel_xpu():""",
+     """def synchronize():
+    if cpu_mode():
+        return
+    if is_tpu():
+        torch.accelerator.synchronize()
+    elif is_intel_xpu():"""),
+    ("""    if cpu_state == CPUState.MPS:
+        torch.mps.empty_cache()
+    elif is_intel_xpu():""",
+     """    if cpu_state == CPUState.MPS:
+        torch.mps.empty_cache()
+    elif is_tpu():
+        torch.accelerator.empty_cache()
+    elif is_intel_xpu():"""),
+]
+
+
+def patch_model_management_tpu():
+    path = COMFY / "comfy" / "model_management.py"
+    source = path.read_text(encoding="utf-8")
+    if "def is_tpu(" in source:
+        log("TPU 设备补丁已存在，跳过")
+        return
+    patched = source
+    for index, (old, new) in enumerate(TPU_PATCHES, 1):
+        if old not in patched:
+            raise RuntimeError(
+                "TPU 设备补丁第 %d/%d 处锚点缺失：ComfyUI %s 与补丁不匹配。"
+                "TPU 模式固定使用 %s；请删除 /content/ComfyUI 后重跑，"
+                "或「运行时 → 断开并删除运行时」再 Run all。"
+                % (index, len(TPU_PATCHES), _comfy_version() or "未知", COMFY_TPU_TAG)
+            )
+        patched = patched.replace(old, new, 1)
+    path.write_text(patched, encoding="utf-8")
+    # 只编译、不 import：kernel import torch 会占住 TPU。
+    run([sys.executable, "-m", "py_compile", str(path)], timeout=60)
+    shutil.rmtree(COMFY / "comfy" / "__pycache__", ignore_errors=True)
+    log("已给 comfy/model_management.py 打上 %d 处 TPU 设备补丁"
+        % len(TPU_PATCHES))
 
 
 def comfy_ready():
     return http_status(COMFY_URL + "/object_info", timeout=3.0) == 200
 
 
-if comfy_ready():
+def comfy_device_name():
+    try:
+        stats = http_json(COMFY_URL + "/system_stats", timeout=10)
+        devices = stats.get("devices") or []
+        if devices and isinstance(devices[0], dict):
+            return str(devices[0].get("name") or "")
+    except Exception:
+        pass
+    return ""
+
+
+def comfy_mismatch():
+    current = comfy_device_name().lower()
+    if ACCELERATOR == "tpu":
+        return "tpu" not in current
+    return "tpu" in current
+
+
+if comfy_ready() and not comfy_mismatch():
     log("ComfyUI 已在运行，跳过启动")
 else:
+    if comfy_ready():
+        log("现有 ComfyUI 设备与本次 %s 不匹配，重启服务…" % DEVICE_LABEL)
     kill_matching("main.py --listen")
-    log("后台启动 ComfyUI（日志 %s）..." % COMFY_LOG)
+    if ACCELERATOR == "tpu":
+        patch_model_management_tpu()
+    flags = ["--bf16-unet"] if ACCELERATOR == "tpu" else ["--force-fp16"]
+    log("后台启动 ComfyUI（%s，日志 %s）..."
+        % ("bf16" if ACCELERATOR == "tpu" else "fp16", COMFY_LOG))
     log_handle = open(COMFY_LOG, "ab")
     subprocess.Popen(
-        [sys.executable, "main.py", "--listen", "127.0.0.1", "--port", "8188",
-         "--force-fp16"],
+        [sys.executable, "main.py", "--listen", "127.0.0.1", "--port", "8188"] + flags,
         cwd=str(COMFY),
         stdout=log_handle,
         stderr=subprocess.STDOUT,
         start_new_session=True,
     )
-    if not wait_until("ComfyUI 就绪（/object_info 返回 200）", comfy_ready, timeout=240):
-        print(tail(COMFY_LOG, 40))
+    timeout = 360 if ACCELERATOR == "tpu" else 240
+    if not wait_until("ComfyUI 就绪（/object_info 返回 200）", comfy_ready, timeout=timeout):
+        log_text = tail(COMFY_LOG, 60)
+        print(log_text)
+        if ACCELERATOR == "tpu" and "TPU is already in use" in log_text:
+            raise RuntimeError(
+                "TPU 被其它进程占用（见上方日志）。请「运行时 → 断开并删除运行时」后重新 Run all。"
+            )
         raise RuntimeError(
             "ComfyUI 启动超时（见上方日志）。常见原因：模型缺失 / 显存不足 / 端口占用。"
             "修复后重跑本 cell。"
@@ -388,6 +694,9 @@ try:
         % (system.get("comfyui_version", "?"),
            system.get("python_version", "?"),
            system.get("pytorch_version", "?")))
+    devices = stats.get("devices") or []
+    if devices and isinstance(devices[0], dict):
+        log("ComfyUI 计算设备: %s" % devices[0].get("name"))
 except Exception as exc:
     log("读取 /system_stats 失败（不影响出图）: %r" % (exc,))
 '''
@@ -437,18 +746,22 @@ else:
         log("网关源码已更新，重启网关加载新代码")
     kill_matching("anima_gateway.py")
     log_handle = open(GATEWAY_LOG, "ab")
+    gateway_env = dict(os.environ)
+    gateway_env["ANIMA_ACCELERATOR"] = ACCELERATOR
+    gateway_env["ANIMA_DEVICE_LABEL"] = DEVICE_LABEL
     subprocess.Popen(
         [sys.executable, str(GATEWAY_PY), "--token", token, "--port", "8081",
          "--comfy", COMFY_URL, "--comfy-root", str(COMFY)],
         stdout=log_handle,
         stderr=subprocess.STDOUT,
         start_new_session=True,
+        env=gateway_env,
     )
     if not wait_until("本地网关 /anima/v1/health comfy=true", gateway_ready, timeout=60):
         print(tail(GATEWAY_LOG, 30))
         raise RuntimeError("网关启动失败（见上方 gateway.log）。修复后重跑本 cell。")
     hash_file.write_text(gateway_hash, encoding="utf-8")
-    log("网关已就绪: " + GATEWAY_URL)
+    log("网关已就绪: %s（%s）" % (GATEWAY_URL, DEVICE_LABEL))
 '''
 CODE_GATEWAY = (
     CODE_GATEWAY_HEAD
@@ -575,7 +888,7 @@ os.chmod(PAIR_FILE, 0o600)
 
 print("")
 print("=" * 72)
-print("  ✅ Anima Colab 服务端已就绪（ComfyUI + 网关 + Cloudflare 隧道）")
+print("  ✅ Anima Colab 服务端已就绪（%s + ComfyUI + 网关 + Cloudflare 隧道）" % DEVICE_LABEL)
 print("=" * 72)
 print("")
 print("PAIR: " + pair)
@@ -584,13 +897,19 @@ print("手机端操作：")
 print("  1. 打开 Anima App → 右上角设置 → 「粘贴配对信息」")
 print("  2. 粘贴上面整行（从 PAIR: 到 token 结尾）→ 保存")
 print("  3. 点「测试连接」，显示在线后回主页输入提示词生成")
-print("  4. base 1024x1024 / 30 步约需 65-90 秒")
+if ACCELERATOR == "tpu":
+    print("  4. 首张图会先编译约 1 分钟；之后 1024x1024 / 30 步约 36 秒")
+else:
+    print("  4. base 1024x1024 / 30 步约需 65-90 秒")
 print("")
 print("注意：")
 print("  - 保持本 Colab 页面/App 打开，免费会话约 1-3 小时（受额度限制）。")
 print("  - 断开后重新打开本 notebook →「全部运行」，会生成新的 PAIR（新 token + 新 URL），")
 print("    App 需要重新粘贴。")
 print("  - 建议把本 notebook 保存到 Google Drive（文件 → 保存副本），下次打开直接 Run all。")
+if ACCELERATOR == "tpu":
+    print("  - TPU 模式：kernel 不能 import torch；若报 'TPU is already in use'，")
+    print("    请「运行时 → 断开并删除运行时」后重新 Run all。")
 print("  - 只想再抄一次 PAIR：单独运行下面的「查看 PAIR / 状态」cell。")
 print("=" * 72)
 '''
@@ -609,6 +928,7 @@ token_now = TOKEN_FILE.read_text(encoding="utf-8").strip() if TOKEN_FILE.exists(
 try:
     health = http_json(GATEWAY_URL + "/anima/v1/health", token=token_now, timeout=8)
     print("本地网关: " + json.dumps(health, ensure_ascii=False))
+    print("计算设备: %s" % health.get("device"))
 except Exception as exc:
     print("本地网关不可用: %r（重跑前面的部署 cell）" % (exc,))
 try:
@@ -681,12 +1001,20 @@ print("wrote %s (%d cells, %d bytes)" % (OUT, len(cells), OUT.stat().st_size))
 # to a Colab kernel. Self-contained: the gateway source is already inlined.
 # ---------------------------------------------------------------------------
 deploy_header = '''#!/usr/bin/env python3
-"""Anima Colab T4 one-file deployment script (runs inside the Colab kernel).
+"""Anima Colab T4 / TPU one-file deployment script (runs inside the Colab kernel).
 
 Self-contained: installs ComfyUI + anima-base + qwen TE/VAE, starts ComfyUI,
 starts the token-auth gateway and a Cloudflare quick tunnel, then prints
 
     PAIR: https://<random>.trycloudflare.com|<token>
+
+Accelerator:
+    auto-detected (T4 via nvidia-smi, TPU via torch_tpu / TPU env vars).
+    The App sets ANIMA_ACCELERATOR=t4|tpu before sending this file, which also
+    acts as a guard: a mismatched Colab runtime fails fast with instructions.
+    TPU mode pins ComfyUI to the tag its 11 device patches are verified against,
+    skips torch/torchvision/torchaudio in requirements, and starts with
+    --bf16-unet instead of --force-fp16.
 
 How the App uses it:
     POST /api/kernels -> WS /api/kernels/<id>/channels -> execute_request with
@@ -707,3 +1035,11 @@ compile(deploy_text, "colab/deploy_script.py", "exec")
 DEPLOY_OUT = ROOT / "colab" / "deploy_script.py"
 DEPLOY_OUT.write_text(deploy_text, encoding="utf-8")
 print("wrote %s (%d bytes)" % (DEPLOY_OUT, DEPLOY_OUT.stat().st_size))
+
+# App 的内置资产必须与服务端模板同步，否则「一键模式」会跑旧脚本。
+ASSETS = ROOT / "android" / "app" / "src" / "main" / "assets"
+if ASSETS.is_dir():
+    (ASSETS / "anima_colab.ipynb").write_text(
+        OUT.read_text(encoding="utf-8"), encoding="utf-8")
+    (ASSETS / "colab_deploy.py").write_text(deploy_text, encoding="utf-8")
+    print("synced Android assets: colab_deploy.py + anima_colab.ipynb")

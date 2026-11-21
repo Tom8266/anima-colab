@@ -1,6 +1,6 @@
-# Anima × Colab T4 服务端使用说明（手机端独立方案）
+# Anima × Colab T4 / TPU v5e1 服务端使用说明（手机端独立方案）
 
-本文面向**使用者**（手机党）：把 Colab T4 变成自己的 Anima 出图服务器，App 通过 Cloudflare
+本文面向**使用者**（手机党）：把 Colab（T4 GPU 或 TPU v5e1）变成自己的 Anima 出图服务器，App 通过 Cloudflare
 快速隧道连接，不依赖电脑、不需要搬 ComfyUI 前端。
 
 - 服务端实现：`colab/deploy_script.py`（App 一键部署载荷）、`colab/anima_colab.ipynb`（备用一键 notebook）、`colab/gateway.py`（token 鉴权网关）
@@ -11,8 +11,8 @@
 
 | 方式 | 适用 | 操作 |
 |---|---|---|
-| **App 一键模式（推荐，v2）** | 日常使用 | App 设置页点「一键启动 Colab T4」→ App 自动登录 Google、申请/复用 T4、在 kernel 里执行 `deploy_script.py`（`colab/deploy_script.py`）、自动解析 PAIR 并连接。首次约 3-4 分钟，之后复用已部署 VM 约 10-20 秒。用户**不需要**打开 Colab 网页或复制任何东西。 |
-| **notebook 手动模式（备用）** | 调试 / 没有一键功能的旧版 App | 手机浏览器打开 `colab/anima_colab.ipynb` → 运行时选 T4 → 全部运行 → 长按复制 `PAIR:` 行 → App 设置粘贴。 |
+| **App 一键模式（推荐，v2）** | 日常使用 | App 设置页选择 **T4 GPU / TPU v5e1** → 点「一键启动 Colab」→ App 自动登录 Google、申请/复用会话、在 kernel 里执行 `deploy_script.py`（`colab/deploy_script.py`）、自动解析 PAIR 并连接。首次约 3-5 分钟（TPU 4-6 分钟），之后复用已部署 VM 约 10-20 秒。用户**不需要**打开 Colab 网页或复制任何东西。 |
+| **notebook 手动模式（备用）** | 调试 / 没有一键功能的旧版 App | 手机浏览器打开 `colab/anima_colab.ipynb` → 运行时选 T4 GPU 或 TPU v5e1 → 全部运行 → 长按复制 `PAIR:` 行 → App 设置粘贴。 |
 
 本文第 2、3 节讲手动模式；一键模式的协议/实现细节见
 [`../colab/PHONE_BOOTSTRAP.md`](../colab/PHONE_BOOTSTRAP.md)。
@@ -29,6 +29,7 @@
 - 每次会话 token 随机生成（`secrets.token_urlsafe(24)`），不写死、不进日志。
 - 只下载 3 个文件：`anima-base-v1.0.safetensors`（3.9G）+ `qwen_3_06b_base.safetensors`（1.2G）
   + `qwen_image_vae.safetensors`（243M），共约 5.3GB。
+- T4 用 fp16（`--force-fp16`）；TPU v5e1 用 bf16（`--bf16-unet`，部署时自动打 11 处 ComfyUI 设备补丁）。
 
 ## 2. 第一次使用（电脑或手机浏览器都行）
 
@@ -36,7 +37,10 @@
    - 方式 A：把 `colab/anima_colab.ipynb` 上传到自己的 Google Drive；
    - 方式 B：在 Colab 里 `文件 → 上传笔记本` 选择该文件。
    - 建议方式 A：以后每次直接打开，无需再次上传。
-2. **确认 GPU**：`运行时 → 更改运行时类型 → T4 GPU`（免费版即可；只支持 T4）。
+2. **确认运行时**：`运行时 → 更改运行时类型`：
+   - **T4 GPU**（默认，稳定档，免费版可用）；
+   - **TPU v5e1**（实验档，比 T4 快约 2 倍；免费账号可用，v6e1 通常没有配额）。
+   - TPU 模式请从新打开的 notebook 直接「全部运行」；不要在 kernel 里手动 `import torch`，否则 ComfyUI 抢不到 TPU。
 3. **全部运行**：菜单 `运行时 → 全部运行`（或 `Ctrl+F9`）。
    - 首次约 8-15 分钟：克隆 ComfyUI、装依赖、下载 5.3GB 模型、启动服务、建隧道。
    - 每个 cell 都有中文进度输出；下载中断没关系，重跑对应 cell 会续传。
@@ -54,8 +58,8 @@
 
 1. 打开 Anima App → 右上角设置 → **「粘贴配对信息」**。
 2. 粘贴整行 `PAIR: ...` → 保存。
-3. 点 **「测试连接」**：成功即显示在线（会带出设备 Tesla T4 / 已装模型）。
-4. 回主页输入提示词生成。base 1024×1024 / 30 步 / CFG 4.5 约 **65-90 秒**。
+3. 点 **「测试连接」**：成功即显示在线（会带出设备 Tesla T4 或 TPU v5e1 / 已装模型）。
+4. 回主页输入提示词生成。base 1024×1024 / 30 步 / CFG 4.5：T4 约 **65-90 秒**，TPU 约 **36 秒**（首图多约 1 分钟 JIT 编译）。
 
 ## 4. 会话与保活
 
@@ -72,7 +76,7 @@
 ## 5. 断线后怎么办（最常见）
 
 1. 重新打开同一个 notebook（Drive 里的副本）。
-2. 确认运行时类型还是 T4，`运行时 → 全部运行`。
+2. 确认运行时类型还是原来的 T4 / TPU v5e1，`运行时 → 全部运行`。
 3. 等它重新部署（**模型会重新下载**，因为 `/content` 是临时的；约 5-10 分钟）。
 4. 会打印**新的 PAIR**（新 URL + 新 token）→ App 里重新粘贴即可。
 
@@ -82,7 +86,10 @@
 
 | 现象 | 原因 / 处理 |
 |---|---|
-| 某 cell 报 `torch 不可用` / `没有检测到 GPU` | 运行时类型不是 GPU。`运行时 → 更改运行时类型 → T4 GPU`，再「全部运行」。 |
+| 某 cell 报 `torch 不可用` / `没有检测到 GPU` | 运行时类型不是 GPU，且也没检测到 TPU。`运行时 → 更改运行时类型` 选 T4 GPU 或 TPU v5e1，再「全部运行」。 |
+| TPU 日志出现 `TPU is already in use` | kernel 或旧进程占着 TPU。用「运行时 → 断开并删除运行时」清掉进程，重新打开 notebook 全部运行。 |
+| TPU 首张图很慢 | 正常：SDPA/JIT 首次编译。1024² 约多 1 分钟；1080×2400 实测约多 5 分钟。换分辨率会重新编译。 |
+| TPU 模式报补丁锚点缺失 | ComfyUI 版本与补丁不匹配。TPU 模式会固定 `v0.46.2`；删除 `/content/ComfyUI` 后重跑即可。 |
 | `colab exec` 报 `TimeoutError: Timeout waiting for reply` | 大文件下载超出 CLI 等待时间，**VM 仍在继续下载**。重跑即可，`.part` 续传。 |
 | 模型下载反复失败 | Colab 访问 HF 抖动。重跑对应 cell；代码内已自动重试 3 次并保留 `.part`。 |
 | cloudflared 下载/启动失败 | 代码会自动重试并自动从 QUIC 切 HTTP/2；还失败就重跑第 4 步 cell。日志：`/content/cloudflared.log`。 |
@@ -105,14 +112,16 @@
 ## 8. 开发者：本地联调（不需要打开浏览器）
 
 ```bash
-# 1) 建会话（免费版可 T4；注意同一时间只保留一个会话）
+# 1) 建会话（免费版可 T4 或 TPU v5e1；注意同一时间只保留一个会话）
 colab new --gpu T4 -s anima
+colab new --tpu v5e1 -s anima-tpu   # 验证 TPU 时
 
 # 2) 把 notebook 抽成线性 Python 脚本（跳过保活 cell；发现 IPython magic 会报错）
 python3 scripts/extract_notebook.py colab/anima_colab.ipynb /tmp/anima_deploy.py
 
 # 3) 在 VM 上部署（幂等，可重复执行；下载超时属正常）
 colab exec -s anima --timeout 1800 -f /tmp/anima_deploy.py
+colab exec -s anima-tpu --timeout 1800 -f /tmp/anima_deploy.py  # TPU
 
 # 4) 取 PAIR（脚本会自动打印；也可单独 exec 查看）
 ```

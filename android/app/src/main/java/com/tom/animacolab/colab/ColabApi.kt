@@ -86,9 +86,12 @@ class ColabApi(
      * 每次重试前先重新 GET 一次以对账（避免重复分配）；412 直接失败。
      *
      * @param notebookHash [notebookHash] 生成值（web-safe base64 UUID）。
-     * @param accelerator 加速卡类型，默认 T4。
+     * @param accelerator 加速卡档位，默认 T4；TPU 会申请 `variant=TPU&accelerator=V5E1`。
      */
-    suspend fun assign(notebookHash: String, accelerator: String = "T4"): AssignmentInfo {
+    suspend fun assign(
+        notebookHash: String,
+        accelerator: ColabAccelerator = ColabAccelerator.T4,
+    ): AssignmentInfo {
         require(notebookHash.isNotBlank()) { "notebookHash 不能为空" }
         val url = assignUrl(notebookHash, accelerator)
         var attempt = 1
@@ -96,7 +99,7 @@ class ColabApi(
             try {
                 // 重试/首次都先 GET：既拿 xsrf，也用于对账（可能上一次 POST 成功但响应超时）。
                 val getResponse = JSONObject(getText(url))
-                parseExistingAssignment(getResponse, fallbackAccelerator = accelerator)?.let { return it }
+                parseExistingAssignment(getResponse, fallbackAccelerator = accelerator.apiName)?.let { return it }
 
                 val xsrfToken = getResponse.optString("token")
                 if (xsrfToken.isBlank()) {
@@ -106,7 +109,7 @@ class ColabApi(
                     )
                 }
                 val postResponse = JSONObject(postText(url, xsrfToken))
-                return parseAssignmentInfo(postResponse, fallbackAccelerator = accelerator)
+                return parseAssignmentInfo(postResponse, fallbackAccelerator = accelerator.apiName)
             } catch (e: ColabProtocolException) {
                 if (e.statusCode == 412) {
                     throw ColabProtocolException(
@@ -141,8 +144,11 @@ class ColabApi(
 
     internal fun assignmentsUrl(): String = "$rootUrl/tun/m/assignments?authuser=0"
 
-    internal fun assignUrl(notebookHash: String, accelerator: String = "T4"): String =
-        "$rootUrl/tun/m/assign?nbh=$notebookHash&variant=GPU&accelerator=$accelerator&authuser=0"
+    internal fun assignUrl(
+        notebookHash: String,
+        accelerator: ColabAccelerator = ColabAccelerator.T4,
+    ): String = "$rootUrl/tun/m/assign?nbh=$notebookHash" +
+        "&variant=${accelerator.variant}&accelerator=${accelerator.apiName}&authuser=0"
 
     internal fun unassignUrl(endpoint: String): String =
         "$rootUrl/tun/m/unassign/$endpoint?authuser=0"

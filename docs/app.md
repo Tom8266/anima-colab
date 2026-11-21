@@ -56,31 +56,34 @@ ui/
 
 ```
 colab/
+  ColabAccelerator.kt    T4 / TPU v5e1 档位（API accelerator+variant、部署模式、文案）
   ColabApi.kt            assignments API：list / assign(GET xsrf→POST) / unassign / notebookHash
   JupyterKernelClient.kt runtime REST（create/delete kernel）+ Jupyter WebSocket execute（流式 stdout）
   GoogleAuth.kt          Google OAuth（PKCE + remote 授权码流程）+ token 自动刷新 + 本地存储
-  ColabSessionStore.kt   一键会话持久化（endpoint/kernel/proxy token/PAIR，App 重启可复用）
-  ColabSessionManager.kt 状态机：复用或申请 T4 → 建 kernel → 执行 assets/colab_deploy.py
+  ColabSessionStore.kt   一键会话持久化（endpoint/kernel/proxy token/PAIR/选中的加速卡）
+  ColabSessionManager.kt 状态机：复用或申请 T4/TPU → 建 kernel → 执行 assets/colab_deploy.py
                          → 解析 PAIR → 写入 ConfigStore → 4 分钟心跳保活 → 停止时 unassign
 ```
 
-流程：设置页点「一键启动 Colab T4」→ `ColabSessionManager.start()` →
-`ColabApi.listAssignments()`（优先复用持久化的 endpoint，其次任意 T4）→ 无则 `assign(new nbh, T4)` →
-`JupyterKernelClient.createKernel()` → `execute(部署脚本)`（`onStream` 实时把 `[deploy]` 行推给 UI）→
-正则解析 `PAIR: <url>|<token>` → 写入配对 → `connect()`。
+流程：设置页/生成页选择运行设备（T4 GPU 或 TPU v5e1）→ 点「一键启动 Colab」→ `ColabSessionManager.start()` →
+`ColabApi.listAssignments()`（优先复用持久化的 endpoint，其次任意同档位会话）→
+无则 `assign(new nbh, accelerator)`（T4: `variant=GPU&accelerator=T4`；TPU: `variant=TPU&accelerator=V5E1`）→
+`JupyterKernelClient.createKernel()` → `execute(部署脚本)`（脚本前注入 `ANIMA_ACCELERATOR=t4|tpu`，
+`onStream` 实时把 `[deploy]` 行推给 UI）→ 正则解析 `PAIR: <url>|<token>` → 写入配对 → `connect()`。
+TPU 模式每次新建 kernel，避免 kernel import torch 后 libtpu 被占住；部署脚本负责 ComfyUI 设备补丁与 bf16 启动。
 停止会话：删 kernel + `unassign(endpoint)` + 清空本地会话；若是自动写入的配对会一并清除（手动配对不受影响）。
 
 ## 后台保活 / 通知 / 自动下载
 
 - **前台服务保活**：会话 Ready 后启动 `KeepaliveService`（`foregroundServiceType=specialUse`），
-  常驻通知「Anima Colab 会话运行中 / T4 保活中」，并带「打开 App」「停止会话」两个动作。
+  常驻通知「Anima Colab 会话运行中 / Colab 保活中」，并带「打开 App」「停止会话」两个动作。
   心跳（每 4 分钟一次 kernel 执行）跑在 Application 级协程里，所以切后台/关屏不会断。
   设置页可关（「通知与保存 → 后台保活」）。
 - **生成完自动下载**：出图后自动把 PNG 拉到 App 私有存储 `files/images/`（不写系统相册），
   通知文案明确「点保存才会进相册」。`保存` 按钮才写 MediaStore（`Pictures/AnimaColab`）；
   `分享` 也优先复用本地字节，不再重复走隧道下载。
 - **系统通知**：`Notifications` 统一管理两个渠道（`colab_session` 低优先级常驻；`generation` 普通优先级），
-  事件包括：Colab T4 已就绪 / 出图完成（含自动下载数量）/ 生成失败 / 会话断开。
+  事件包括：Colab 已就绪 / 出图完成（含自动下载数量）/ 生成失败 / 会话断开。
   Android 13+ 启动时申请 `POST_NOTIFICATIONS`。
 
 ## 生成流程
